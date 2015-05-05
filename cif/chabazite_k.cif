@@ -1,0 +1,66 @@
+data_global
+_chemical_name_mineral 'Chabazite-Mg'
+loop_
+_publ_author_name
+'Montagna G'
+'Bigi S'
+'Konya P'
+'Szakall S'
+'Vezzalini G'
+_journal_name_full 'American Mineralogist'
+_journal_volume 95 
+_journal_year 2010
+_journal_page_first 939
+_journal_page_last 945
+_publ_section_title
+;
+ Chabazite-Mg: A new natural zeolite of the chabazite series
+;
+_database_code_amcsd 0005050
+_chemical_compound_source 'basalts of Praga Hill, Veszprem County, West Hungary'
+_chemical_formula_sum 'Mg.66 K.52 Ca.348 (Si8.88 Al3.12) O33.66 H19.32'
+_cell_length_a 9.3433
+_cell_length_b 9.3433
+_cell_length_c 9.3433
+_cell_angle_alpha 94.894
+_cell_angle_beta 94.894
+_cell_angle_gamma 94.894
+_cell_volume 806.178
+_exptl_crystal_density_diffrn      1.940
+_symmetry_space_group_name_H-M 'R -3 m'
+loop_
+_space_group_symop_operation_xyz
+  'x,y,z'
+  '-x,-z,-y'
+  '-z,-x,-y'
+  'y,x,z'
+  'y,z,x'
+  '-z,-y,-x'
+  '-x,-y,-z'
+  'x,z,y'
+  'z,x,y'
+  '-y,-x,-z'
+  '-y,-z,-x'
+  'z,y,x'
+loop_
+_atom_site_label
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+_atom_site_U_iso_or_equiv
+MgC3a   0.42500   0.35000   0.42500   0.11000   0.08500
+KC2   0.23800   0.23800   0.23800   0.26000   0.04700
+CaC4   0.58430   0.58430   0.22100   0.05800   0.04100
+SiT   0.10679   0.33406   0.87926   0.74000   0.01480
+AlT   0.10679   0.33406   0.87926   0.26000   0.01480
+O1   0.25830  -0.25830   0.00000   1.00000   0.04410
+O2   0.15440  -0.15440   0.50000   1.00000   0.03210
+O3   0.25600   0.25600   0.89980   1.00000   0.04050
+O4   0.03130   0.03130   0.33120   1.00000   0.03460
+Wat1   0.00000   0.50000   0.50000   0.48000   0.13000
+Wat2   0.25800   0.25800   0.52400   0.24000   0.16000
+Wat3   0.15100   0.41900   0.51100   0.29000   0.19000
+Wat4   0.37500  -0.37500   0.50000   0.34000   0.20000
+Wat6a   0.28900   0.28900   0.23200   0.21000   0.07200
+
