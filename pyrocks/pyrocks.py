@@ -3,8 +3,97 @@ import re
 import logging
 import urllib2
 import numpy as np
-import pulp as lp
+import pulp
 import CifFile as cif
+
+class Model:
+    def __init__(self, name):
+        self.name = name
+        self.phases = {} 
+ 
+    # Fuction to add all mineral phases used in model
+    def add_phase(self, phase):
+        self.phases[phase] = Phase(phase)
+
+    # Function for adding the bulk chemical composition to model
+    def add_bulk(self, oxide, wt):
+        self.bulk[oxide] = wt
+
+# Minearl Phase Class
+# Contains all information relevant for a phase to be added to model
+# Attributes:
+#   Name 
+#   Chemical formula
+#   QXRD abundance
+#   Oxide composition
+#   Variability of individual oxide components
+class Phase:
+    def __init__(self, name):
+        self.name = name
+        self.formula = ''
+        self.qxrd = 0
+        self.oxides = {}
+        self.delta_oxides = {}
+
+    def add_formula(self, formula):
+        self.formula = formula
+
+    def add_qxrd(self, qxrd):
+        self.qxrd = qxrd
+
+    def add_oxide(self, oxide, wt):
+        self.oxides[oxide] = wt
+
+    def add_delta(self, delta_oxide, value):
+        self.delta_oxides[delta_oxide] = value
+
+# Dictionary of phases in the Rocknest 
+phases = ['plagioclase', 
+          'forsterite', 
+          'augite',
+          'pigeonite',
+          'magnetite',
+          'anhydrite',
+          'quartz',
+          'sanidine',
+          'hematite',
+          'ilmenite'] 
+
+bulk = ['SiO2',
+        'TiO2',
+        'Al2O3', 
+        'Fe2O3+FeO',
+        'MnO',
+        'MgO',
+        'CaO',
+        'Na2O',
+        'K2O',
+        'SO3', 
+        'H2O'] 
+
+# Dictionary of Rietveld phase abundances in Rocknest, Bish 2013
+phase_abun = {'plagioclase': 40.8,
+              'forsterite': 22.4,
+              'augite': 14.6,
+              'pigeonite': 13.8,
+              'magnetite': 2.1,
+              'anhydrite': 1.5,
+              'quartz': 1.4,
+              'sanidine': 1.3,
+              'hematite': 1.1,
+              'ilmenite': 0.9} 
+
+# Dictionary of Rietveld 2sigma values of Rocknest soil, Bish 2013
+phase_2sigma = {'plagioclase': 2.4,
+                'forsterite': 1.9,
+                'augite': 2.8,
+                'pigeonite': 2.8,
+                'magnetite': 0.8,
+                'anhydrite': 0.7,
+                'quartz': 0.6,
+                'sanidine': 1.3,
+                'hematite': 0.9,
+                'ilmenite': 0.9} 
 
 # Dictionary element to oxide 
 elem2oxide = {'Si': 'SiO2',
@@ -34,28 +123,6 @@ num_oxy =   {'Si': 2,
              'Mg': 1, 
              'H': 0.5, 
              'K': 0.5}
-
-phase_abun = {'Plagioclase': 40.8,
-              'Forsterite': 22.4,
-              'Augite': 14.6,
-              'Pigeonite': 13.8,
-              'Magnetite': 2.1,
-              'Anhydrite': 1.5,
-              'Quartz': 1.4,
-              'Sanidine': 1.3,
-              'Hematite': 1.1,
-              'Ilmenite': 0.9} 
-
-phase_2sigma = {'Plagioclase': 2.4,
-                'Forsterite': 1.9,
-                'Augite': 2.8,
-                'Pigeonite': 2.8,
-                'Magnetite': 0.8,
-                'Anhydrite': 0.7,
-                'Quartz': 0.6,
-                'Sanidine': 1.3,
-                'Hematite': 0.9,
-                'Ilmenite': 0.9} 
 
 def is_number(s):
     try:
@@ -140,6 +207,16 @@ def main_loop():
     
     testAPXSdata = getAPXSData(apxs_url)
     test_array = np.genfromtxt(testAPXSdata, delimiter=',')
+
+    model_name = 'Rocknest'
+
+    # Begin of linear programming code
+    prob = pulp.LpProblem(model_name, LpMinimize) 
+
+    # Objective function
+    #prob += lpSum([])
+
+    #prob += lpSum([
 
 if __name__ == "__main__":
     import sys
