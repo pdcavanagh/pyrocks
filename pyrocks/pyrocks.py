@@ -33,7 +33,7 @@ class Phase:
         self.formula = ''
         self.qxrd = 0
         self.oxides = {}
-        self.delta_oxides = {}
+        self.deltas = {}
 
     def add_formula(self, formula):
         self.formula = formula
@@ -45,7 +45,7 @@ class Phase:
         self.oxides[oxide] = wt
 
     def add_delta(self, delta_oxide, value):
-        self.delta_oxides[delta_oxide] = value
+        self.deltas[delta_oxide] = value
 
 # Dictionary of phases in the Rocknest 
 phases = ['plagioclase', 
