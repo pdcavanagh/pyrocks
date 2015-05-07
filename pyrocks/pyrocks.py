@@ -49,7 +49,7 @@ class Phase:
 
 # Dictionary of phases in the Rocknest 
 phases = ['plagioclase', 
-          'forsterite', 
+          'olivine', 
           'augite',
           'pigeonite',
           'magnetite',
@@ -73,7 +73,7 @@ bulk = ['SiO2',
 
 # Dictionary of Rietveld phase abundances in Rocknest, Bish 2013
 phase_abun = {'plagioclase': 40.8,
-              'forsterite': 22.4,
+              'olivine': 22.4,
               'augite': 14.6,
               'pigeonite': 13.8,
               'magnetite': 2.1,
@@ -85,7 +85,7 @@ phase_abun = {'plagioclase': 40.8,
 
 # Dictionary of Rietveld 2sigma values of Rocknest soil, Bish 2013
 phase_2sigma = {'plagioclase': 2.4,
-                'forsterite': 1.9,
+                'olivine': 1.9,
                 'augite': 2.8,
                 'pigeonite': 2.8,
                 'magnetite': 0.8,
