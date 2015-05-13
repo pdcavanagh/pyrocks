@@ -9,11 +9,16 @@ import CifFile as cif
 class Model:
     def __init__(self, name):
         self.name = name
-        self.phases = {} 
+        self.phases = {}
+        self.free_variables = {}
+        self.bulk = {} 
  
     # Fuction to add all mineral phases used in model
     def add_phase(self, phase):
         self.phases[phase] = Phase(phase)
+
+    def add_free_variable(self, fv_name, values):
+        self.free_variables[fv_name] =  values
 
     # Function for adding the bulk chemical composition to model
     def add_bulk(self, oxide, wt):
@@ -154,7 +159,10 @@ def getAPXSData(url):
     req = urllib2.Request(url)
     # make the request and print the results
     res = urllib2.urlopen(req)
-    return res 
+    data_array = np.genfromtxt(res, delimiter=',', skip_header=True, names=True, dtype=None )
+    for x in data_array:
+        x[0] = x[0].strip()
+    return data_array 
 
 # Functions for seperating a chemical forumla into atom components
 # Returns list of elements and list of stoiciometric coefficients
@@ -224,7 +232,6 @@ def main_loop():
     apxs_url = 'http://pds-geosciences.wustl.edu/msl/msl-m-apxs-4_5-rdr-v1/mslapx_1xxx/data/sol00288/apb_423020067rwp02880060082_______p1.csv'
     
     testAPXSdata = getAPXSData(apxs_url)
-    test_array = np.genfromtxt(testAPXSdata, delimiter=',')
 
     model_name = 'Rocknest'
 
