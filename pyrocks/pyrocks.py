@@ -32,8 +32,20 @@ class Phase:
         self.name = name
         self.formula = ''
         self.qxrd = 0
-        self.oxides = {}
-        self.deltas = {}
+        self.qxrd_error = 0
+        self.oxide_comp = {'SiO2': 0,
+                           'TiO2': 0,
+                           'Al2O3': 0, 
+                           'Fe': 0,
+                           'MnO':  0,
+                           'MgO':  0,
+                           'CaO':  0,
+                           'Na2O': 0,
+                           'K2O':  0,
+                           'SO3':  0,
+                           'H2O':  0}
+        self.delta_oxides = {}
+        self.phase_variables = {}
 
     def add_formula(self, formula):
         self.formula = formula
@@ -41,11 +53,40 @@ class Phase:
     def add_qxrd(self, qxrd):
         self.qxrd = qxrd
 
-    def add_oxide(self, oxide, wt):
-        self.oxides[oxide] = wt
+    def add_qxrd_error(self, error):
+        self.qxrd_error = error
 
-    def add_delta(self, delta_oxide, value):
-        self.deltas[delta_oxide] = value
+    def set_oxide_comp(self, oxide, value):
+        self.oxide_comp[oxide] = value 
+
+    def add_delta_oxide(self, oxide, wts):
+        self.delta_oxides[oxide] = Oxides(oxide, wts)
+
+    def add_phase_variable(self, name, constraint, value):
+        try:  
+            self.phase_variables[name][constraint]=value
+        except:
+            self.phase_variables[name] = {}
+            self.phase_variables[name][constraint]=value
+
+class Oxides:
+    def __init__(self, name, oxides):
+        self.name = name 
+        self.oxides = { 'SiO2': 0,
+                        'TiO2': 0,
+                        'Al2O3': 0, 
+                        'Fe': 0,
+                        'MnO':  0,
+                        'MgO':  0,
+                        'CaO':  0,
+                        'Na2O': 0,
+                        'K2O':  0,
+                        'SO3':  0,
+                        'H2O':  0}
+        for x,y in oxides.items():
+            self.oxides[x] = y    
+        def set_oxide(self, oxide_name, value):
+            self.oxides[oxide_name] = value 
 
 # Dictionary of phases in the Rocknest 
 phases = ['plagioclase', 
@@ -62,7 +103,7 @@ phases = ['plagioclase',
 bulk = ['SiO2',
         'TiO2',
         'Al2O3', 
-        'Fe2O3+FeO',
+        'Fe',
         'MnO',
         'MgO',
         'CaO',
@@ -71,29 +112,6 @@ bulk = ['SiO2',
         'SO3', 
         'H2O'] 
 
-# Dictionary of Rietveld phase abundances in Rocknest, Bish 2013
-phase_abun = {'plagioclase': 40.8,
-              'olivine': 22.4,
-              'augite': 14.6,
-              'pigeonite': 13.8,
-              'magnetite': 2.1,
-              'anhydrite': 1.5,
-              'quartz': 1.4,
-              'sanidine': 1.3,
-              'hematite': 1.1,
-              'ilmenite': 0.9} 
-
-# Dictionary of Rietveld 2sigma values of Rocknest soil, Bish 2013
-phase_2sigma = {'plagioclase': 2.4,
-                'olivine': 1.9,
-                'augite': 2.8,
-                'pigeonite': 2.8,
-                'magnetite': 0.8,
-                'anhydrite': 0.7,
-                'quartz': 0.6,
-                'sanidine': 1.3,
-                'hematite': 0.9,
-                'ilmenite': 0.9} 
 
 # Dictionary element to oxide 
 elem2oxide = {'Si': 'SiO2',
@@ -217,6 +235,7 @@ def main_loop():
     #prob += lpSum([])
 
     #prob += lpSum([
+
 
 if __name__ == "__main__":
     import sys
