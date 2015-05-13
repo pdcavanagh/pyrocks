@@ -93,18 +93,7 @@ class Oxides:
         def set_oxide(self, oxide_name, value):
             self.oxides[oxide_name] = value 
 
-# Dictionary of phases in the Rocknest 
-phases = ['plagioclase', 
-          'olivine', 
-          'augite',
-          'pigeonite',
-          'magnetite',
-          'anhydrite',
-          'quartz',
-          'sanidine',
-          'hematite',
-          'ilmenite'] 
-
+# Example bulk composition oxide components
 bulk = ['SiO2',
         'TiO2',
         'Al2O3', 
