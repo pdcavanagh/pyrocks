@@ -55,6 +55,12 @@ class AddPhaseDlg(QDialog,
         return self.__qxrd
     def qxrdError(self):
         return self.__qxrdError
+    def setPhaseName(self, name):
+        self.phaseNameLineEdit.setText(name)
+    def setQxrd(self, value):
+        self.wtPercDoubleSpinBox.setValue(value)
+    def setQxrdError(self, error):
+        self.qxrdErrorDoubleSpinBox.setValue(error)
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -104,6 +110,12 @@ class MainWindow(QMainWindow):
         # add actions to menu and toolbar
         fileMenu = self.menuBar().addMenu("&File")
         fileMenu.addAction(fileNewAction)
+        fileOpenAction = self.createAction("&Open", self.fileOpen, None,
+                None, "Open a previously created model")
+        fileMenu.addAction(fileOpenAction)
+        fileSaveAction = self.createAction("&Save", self.fileSave, None,
+                None, "Save the current model")
+        fileMenu.addAction(fileSaveAction)
        
         editMenu = self.menuBar().addMenu("&Edit")
 
@@ -117,6 +129,9 @@ class MainWindow(QMainWindow):
         phaseAddAction = self.createAction("&Add Phase", self.phaseAdd, None, 
                 None, "Add a new phase to model")
         phaseMenu.addAction(phaseAddAction)
+        phaseEditAction = self.createAction("&Edit Phase", self.phaseEdit, None, 
+                None, "Edit the selected phase")
+        phaseMenu.addAction(phaseEditAction)
 
         helpMenu = self.menuBar().addMenu("&Help")
         
@@ -144,19 +159,75 @@ class MainWindow(QMainWindow):
             self.model.name = newModelDialog.modelName()
         self.populateTree() 
 
+    def fileOpen(self):
+        fileDialog = QFileDialog()
+        fn = fileDialog.getOpenFileName()
+        if not fn.isNull(): 
+            self.model = pyrocks.open_model(fn)
+            self.populateTree()
+   
+    def fileSave(self):
+        fileDialog = QFileDialog()
+        fn = fileDialog.getSaveFileName()
+        if not fn.isNull(): 
+            self.model = pyrocks.save_model(self.model, fn)
+
     def varAdd(self):
         print 'new var' 
 
     def phaseAdd(self):
         addPhaseDialog = AddPhaseDlg()
         if addPhaseDialog.exec_():
-            newPhase = addPhaseDialog.phaseName()
+            newPhase = unicode(addPhaseDialog.phaseName())
             self.model.add_phase(newPhase)
-            self.model.phases[newPhase].add_qxrd(addPhaseDialog.qxrd())
-            self.model.phases[newPhase].add_qxrd_error(addPhaseDialog.qxrdError())
+            self.phaseStoreData(addPhaseDialog, newPhase)
+            #self.model.phases[newPhase].add_qxrd(addPhaseDialog.qxrd())
+            #self.model.phases[newPhase].add_qxrd_error(addPhaseDialog.qxrdError())
+
+            ## Extract the table oxide components to add to phase 
+            #test_model = addPhaseDialog.tableWidget.model()  
+            #data = []
+            #for row in range(test_model.rowCount()):
+            #  data.append([])
+            #  for column in range(test_model.columnCount()):
+            #    index = test_model.index(row, column)
+            #    if column==0: 
+            #        oxide = str(test_model.data(index).toString())
+            #    if column==1:
+            #        value = float(test_model.data(index).toFloat()[0])
+            #        self.model.phases[newPhase].set_oxide_comp(oxide, value)
+
             self.consoleBrowser.insertPlainText("New phase added: %s\n" % newPhase)
             self.populateTree() 
     
+    def phaseEdit(self):
+        editPhaseDialog = AddPhaseDlg()
+        editPhase = unicode(self.treeWidget.currentItem().text(0))
+        editPhaseDialog.setPhaseName(editPhase) 
+        editPhaseDialog.setQxrd(self.model.phases[editPhase].qxrd)
+        editPhaseDialog.setQxrdError(self.model.phases[editPhase].qxrd_error)
+        self.populatePhaseOxides(editPhaseDialog, editPhase) 
+        if editPhaseDialog.exec_():
+            self.phaseStoreData(editPhaseDialog, editPhase)
+            self.populateTree() 
+
+    def phaseStoreData(self, dlg, newPhase):
+        self.model.phases[newPhase].add_qxrd(dlg.qxrd())
+        self.model.phases[newPhase].add_qxrd_error(dlg.qxrdError())
+
+        # Extract the table oxide components to add to phase 
+        test_model = dlg.tableWidget.model()  
+        data = []
+        for row in range(test_model.rowCount()):
+          data.append([])
+          for column in range(test_model.columnCount()):
+            index = test_model.index(row, column)
+            if column==0: 
+                oxide = str(test_model.data(index).toString())
+            if column==1:
+                value = float(test_model.data(index).toFloat()[0])
+                self.model.phases[newPhase].set_oxide_comp(oxide, value)
+
     def populateTree(self, selectedItem=None):
         selected = None
         self.treeWidget.clear()
@@ -179,7 +250,27 @@ class MainWindow(QMainWindow):
 
         # Expand the whole tree showing all phases and variables
         self.treeWidget.expandItem(modelTreeItem)
+        self.treeWidget.expandItem(phaseTreeItem)
         self.treeWidget.resizeColumnToContents(0)
+
+    def populatePhaseOxides(self, addPhaseDialog, newPhase, selectedItem=None):
+        selected = None
+        addPhaseDialog.tableWidget.clear()
+        addPhaseDialog.tableWidget.setSortingEnabled(False)
+        addPhaseDialog.tableWidget.setRowCount(len(self.model.phases[newPhase].oxide_comp))
+        headers = ["Oxide", "Weight Percent"]
+        addPhaseDialog.tableWidget.setColumnCount(len(headers))
+        addPhaseDialog.tableWidget.setHorizontalHeaderLabels(headers)
+
+        for row, oxide in enumerate(self.model.phases[newPhase].oxide_comp):
+            #print self.model.phases[newPhase].oxide_comp[oxide]
+            item = QTableWidgetItem(oxide)
+            item = QTableWidgetItem(QString("%6") \
+                .arg(float(self.model.phases[newPhase].oxide_comp[oxide]), 6, 'g', 5, QChar(" ")))
+            addPhaseDialog.tableWidget.setItem(row, 0, QTableWidgetItem(oxide))
+            addPhaseDialog.tableWidget.setItem(row, 1, item)
+        addPhaseDialog.tableWidget.resizeColumnsToContents()
+        addPhaseDialog.tableWidget.setSortingEnabled(True)
  
 app = QApplication(sys.argv)
 form = MainWindow()
