@@ -5,6 +5,7 @@ import urllib2
 import numpy as np
 import pulp
 import CifFile as cif
+import pickle
 
 class Model:
     def __init__(self, name):
@@ -23,6 +24,17 @@ class Model:
     # Function for adding the bulk chemical composition to model
     def add_bulk(self, oxide, wt):
         self.bulk[oxide] = wt
+
+def save_model(model, fn):
+    output = open(fn, 'wb')
+    pickle.dump(model, output)
+    output.close()
+
+def open_model(fn):
+    pkl_file = open(fn, 'rb')
+    model = pickle.load(pkl_file)
+    pkl_file.close()
+    return model
 
 # Minearl Phase Class
 # Contains all information relevant for a phase to be added to model
@@ -73,6 +85,7 @@ class Phase:
         except:
             self.phase_variables[name] = {}
             self.phase_variables[name][constraint]=value
+
 
 class Oxides:
     def __init__(self, name, oxides):
