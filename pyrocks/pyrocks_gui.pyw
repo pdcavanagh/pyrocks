@@ -63,21 +63,37 @@ class AddPhaseDlg(QDialog,
         self.qxrdErrorDoubleSpinBox.setValue(error)
 
 class MainWindow(QMainWindow):
+    MODEL_ROW_LENGTH = 20
+
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.dirty = False
         self.filename = None
         self.mirroredvertically = False
         self.mirroredhorizontally = False
-        self.model = pyrocks.Model('unnamed')
+        if fn is not None:
+            self.model = pyrocks.open_model(fn)
+        else:
+            self.model = pyrocks.Model('unnamed')
 
         self.consoleBrowser = QTextBrowser()
-        self.consoleBrowser.setMinimumSize(800,600)
+        self.consoleBrowser.setMinimumSize(800,50)
         self.consoleBrowser.setAlignment(Qt.AlignLeft)
         self.consoleBrowser.setContextMenuPolicy(Qt.ActionsContextMenu)
-        self.setCentralWidget(self.consoleBrowser)
         self.consoleBrowser.insertPlainText("***** Pyrocks ver. %s - written by %s *****\n" % (__version__, __author__))
-        
+        consoleDockWidget = QDockWidget("Console", self)
+        consoleDockWidget.setObjectName("ConsoleDockWidget")
+        consoleDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea|
+                                          Qt.RightDockWidgetArea|
+                                          Qt.TopDockWidgetArea|
+                                          Qt.BottomDockWidgetArea)
+        consoleDockWidget.setWidget(self.consoleBrowser)
+        #self.addDockWidget(Qt.BottomDockWidgetArea, consoleDockWidget)
+       
+        self.modelTable = QTableWidget()
+        self.setCentralWidget(self.modelTable)
+        self.populateModelTable(self.modelTable, None)
+ 
         self.treeWidget = QTreeWidget()
         self.treeWidget.setMinimumSize(200,600)
         logDockWidget = QDockWidget("Model Attributes", self)
@@ -86,11 +102,10 @@ class MainWindow(QMainWindow):
                                       Qt.RightDockWidgetArea)
         logDockWidget.setWidget(self.treeWidget)
         self.addDockWidget(Qt.LeftDockWidgetArea, logDockWidget)
+        self.addDockWidget(Qt.RightDockWidgetArea, consoleDockWidget)
         
         self.populateTree()
  
-        self.printer = None
-
         self.sizeLabel = QLabel()
         self.sizeLabel.setFrameStyle(QFrame.StyledPanel|QFrame.Sunken)
         status = self.statusBar()
@@ -181,22 +196,6 @@ class MainWindow(QMainWindow):
             newPhase = unicode(addPhaseDialog.phaseName())
             self.model.add_phase(newPhase)
             self.phaseStoreData(addPhaseDialog, newPhase)
-            #self.model.phases[newPhase].add_qxrd(addPhaseDialog.qxrd())
-            #self.model.phases[newPhase].add_qxrd_error(addPhaseDialog.qxrdError())
-
-            ## Extract the table oxide components to add to phase 
-            #test_model = addPhaseDialog.tableWidget.model()  
-            #data = []
-            #for row in range(test_model.rowCount()):
-            #  data.append([])
-            #  for column in range(test_model.columnCount()):
-            #    index = test_model.index(row, column)
-            #    if column==0: 
-            #        oxide = str(test_model.data(index).toString())
-            #    if column==1:
-            #        value = float(test_model.data(index).toFloat()[0])
-            #        self.model.phases[newPhase].set_oxide_comp(oxide, value)
-
             self.consoleBrowser.insertPlainText("New phase added: %s\n" % newPhase)
             self.populateTree() 
     
@@ -242,9 +241,12 @@ class MainWindow(QMainWindow):
         phaseTreeItem = QTreeWidgetItem(modelTreeItem, ["Phases"])
         for phase in self.model.phases:
             phases[phase] = QTreeWidgetItem(phaseTreeItem, [phase])
+            # Populate the additional variables for the phase
+            for variable in self.model.phases[phase].phase_variables:
+                QTreeWidgetItem(phases[phase], [variable])
 
         # Populate the variables 
-        varTreeItem = QTreeWidgetItem(modelTreeItem, ["Variables"])
+        #varTreeItem = QTreeWidgetItem(modelTreeItem, ["Variables"])
         #for phase in self.model.phases:
         #    phases[phase] = QTreeWidgetItem(phaseTreeItem, [phase])
 
@@ -271,10 +273,49 @@ class MainWindow(QMainWindow):
             addPhaseDialog.tableWidget.setItem(row, 1, item)
         addPhaseDialog.tableWidget.resizeColumnsToContents()
         addPhaseDialog.tableWidget.setSortingEnabled(True)
- 
-app = QApplication(sys.argv)
-form = MainWindow()
-form.show()
-app.exec_()
+
+    def populateModelTable(self, tableWidget, selectedItem=None):
+        selected = None
+        tableWidget.clear()
+        tableWidget.setSortingEnabled(False)
+        tableWidget.setRowCount(self.MODEL_ROW_LENGTH)
+        headers = []
+
+        # Populate the row labels starting with the oxides
+        tableWidget.setVerticalHeaderLabels(QStringList(pyrocks.bulk))
+
+        for phase in self.model.phases:
+            # Add all phases
+            headers.append(self.model.phases[phase].name)
+            # Add all variables for the current phase
+            for variable in self.model.phases[phase].phase_variables:
+                headers.append(variable)
+
+# Two problems to work out
+# assigning the data point to the correct row lab
+# assigning the data point to the correct column
+
+        tableWidget.setColumnCount(len(headers))
+        tableWidget.setHorizontalHeaderLabels(headers)
+        for phase in self.model.phases:
+            for row, oxide in enumerate(self.model.phases[phase].oxide_comp):
+                print self.model.phases[phase].oxide_comp[oxide]
+                item = QTableWidgetItem(QString("%6") \
+                    .arg(float(self.model.phases[phase].oxide_comp[oxide]), 6, 'g', 5, QChar(" ")))
+                tableWidget.setItem(row, 0, item)
+        tableWidget.resizeColumnsToContents()
+        tableWidget.setSortingEnabled(True)
+
+if __name__ == "__main__":
+    import sys
+    try:
+        fn = sys.argv[1]
+    except:
+        #print "Please provide a filename: python pyrocks.py FILENAME"
+        fn = None
+    app = QApplication(sys.argv)
+    form = MainWindow()
+    form.show()
+    app.exec_()
         
         
