@@ -92,7 +92,7 @@ class MainWindow(QMainWindow):
        
         self.modelTable = QTableWidget()
         self.setCentralWidget(self.modelTable)
-        self.populateModelTable(self.modelTable, None)
+        self.populateModelTable(None)
  
         self.treeWidget = QTreeWidget()
         self.treeWidget.setMinimumSize(200,600)
@@ -198,6 +198,7 @@ class MainWindow(QMainWindow):
             self.phaseStoreData(addPhaseDialog, newPhase)
             self.consoleBrowser.insertPlainText("New phase added: %s\n" % newPhase)
             self.populateTree() 
+            self.populateModelTable() 
     
     def phaseEdit(self):
         editPhaseDialog = AddPhaseDlg()
@@ -209,6 +210,7 @@ class MainWindow(QMainWindow):
         if editPhaseDialog.exec_():
             self.phaseStoreData(editPhaseDialog, editPhase)
             self.populateTree() 
+            self.populateModelTable() 
 
     def phaseStoreData(self, dlg, newPhase):
         self.model.phases[newPhase].add_qxrd(dlg.qxrd())
@@ -274,15 +276,13 @@ class MainWindow(QMainWindow):
         addPhaseDialog.tableWidget.resizeColumnsToContents()
         addPhaseDialog.tableWidget.setSortingEnabled(True)
 
-    def populateModelTable(self, tableWidget, selectedItem=None):
+    def populateModelTable(self, selectedItem=None):
         selected = None
-        tableWidget.clear()
-        tableWidget.setSortingEnabled(False)
-        tableWidget.setRowCount(self.MODEL_ROW_LENGTH)
-        headers = []
-
-        # Populate the row labels starting with the oxides
-        tableWidget.setVerticalHeaderLabels(QStringList(pyrocks.bulk))
+        self.modelTable.clear()
+        self.modelTable.setSortingEnabled(False)
+        self.modelTable.setRowCount(self.MODEL_ROW_LENGTH)
+        headers = ["Var. Comp."]
+        k=1
 
         for phase in self.model.phases:
             # Add all phases
@@ -290,21 +290,34 @@ class MainWindow(QMainWindow):
             # Add all variables for the current phase
             for variable in self.model.phases[phase].phase_variables:
                 headers.append(variable)
+        self.modelTable.setColumnCount(len(headers))
+        self.modelTable.setHorizontalHeaderLabels(headers)
 
-# Two problems to work out
-# assigning the data point to the correct row lab
-# assigning the data point to the correct column
+        # Populate the row labels starting with the oxides
+        for index, oxide in enumerate(pyrocks.bulk):
+            self.modelTable.setItem(index, headers.index("Var. Comp."), QTableWidgetItem(oxide))
 
-        tableWidget.setColumnCount(len(headers))
-        tableWidget.setHorizontalHeaderLabels(headers)
+        #Populate the table by iterating through all phases and variables
         for phase in self.model.phases:
-            for row, oxide in enumerate(self.model.phases[phase].oxide_comp):
-                print self.model.phases[phase].oxide_comp[oxide]
+            for i,x in enumerate(pyrocks.bulk):
+                #oxide = unicode(self.modelTable.verticalHeaderItem(i).text())
                 item = QTableWidgetItem(QString("%6") \
-                    .arg(float(self.model.phases[phase].oxide_comp[oxide]), 6, 'g', 5, QChar(" ")))
-                tableWidget.setItem(row, 0, item)
-        tableWidget.resizeColumnsToContents()
-        tableWidget.setSortingEnabled(True)
+                    .arg(float(self.model.phases[phase].oxide_comp[x]), 6, 'g', 5, QChar(" ")))
+                #print i,oxide,item.text() 
+                self.modelTable.setItem(i, headers.index(phase), item)
+            for variable in self.model.phases[phase].phase_variables:
+                for i,x in enumerate(pyrocks.bulk):
+                    try:
+                        item = QTableWidgetItem(QString("%6") \
+                            .arg(float(self.model.phases[phase].phase_variables[variable][x]), 6, 'g', 5, QChar(" ")))
+                        self.modelTable.setItem(i, headers.index(variable), item)
+                    except:
+                        pass
+                
+        # hide the vertical header column
+        self.modelTable.verticalHeader().setVisible(False)
+        self.modelTable.resizeColumnsToContents()
+        self.modelTable.setSortingEnabled(True)
 
 if __name__ == "__main__":
     import sys
