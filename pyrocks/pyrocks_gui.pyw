@@ -10,7 +10,7 @@ import pyrocks
 import ui_newmodeldlg
 import ui_addphasedlg
 import ui_addqxrddlg
-
+import ui_addvardlg
 
 __version__ = "0.0.1"
 __author__ = "Patrick D. Cavanagh"
@@ -22,13 +22,25 @@ class NewModelDlg(QDialog,
         super(NewModelDlg, self).__init__(parent)
         self.__modelName = unicode('')
         self.setupUi(self)
-
     def accept(self):
         self.__modelName = self.modelNameLineEdit.text()
         QDialog.accept(self)
-
     def modelName(self):
         return self.__modelName 
+
+class AddVarDlg(QDialog,
+                  ui_addvardlg.Ui_AddVarDlg):
+    def __init__(self, parent=None):
+        super(AddVarDlg, self).__init__(parent)
+        self.__variableName = unicode('')
+        self.setupUi(self)
+    def accept(self):
+        self.__variableName = self.varNameLineEdit.text()
+        QDialog.accept(self)
+    def variableName(self):
+        return self.__variableName
+    def setVariableName(self, name):
+        self.varNameLineEdit.setText(name)
 
 class AddPhaseDlg(QDialog,
                   ui_addphasedlg.Ui_AddPhaseDlg):
@@ -39,14 +51,12 @@ class AddPhaseDlg(QDialog,
         self.__qxrd = 0.0
         self.__qxrdError = 0.0
         self.setupUi(self)
-
     def accept(self):
         self.__phaseName = self.phaseNameLineEdit.text()
         self.__phaseFormula = self.phaseFormulaLineEdit.text()
         self.__qxrd = self.wtPercDoubleSpinBox.value()
         self.__qxrdError = self.qxrdErrorDoubleSpinBox.value()
         QDialog.accept(self)
-
     def phaseName(self):
         return self.__phaseName
     def phaseFormula(self):
@@ -88,21 +98,20 @@ class MainWindow(QMainWindow):
                                           Qt.TopDockWidgetArea|
                                           Qt.BottomDockWidgetArea)
         consoleDockWidget.setWidget(self.consoleBrowser)
-        #self.addDockWidget(Qt.BottomDockWidgetArea, consoleDockWidget)
+        self.addDockWidget(Qt.BottomDockWidgetArea, consoleDockWidget)
        
         self.modelTable = QTableWidget()
         self.setCentralWidget(self.modelTable)
         self.populateModelTable(None)
  
         self.treeWidget = QTreeWidget()
-        self.treeWidget.setMinimumSize(200,600)
+        self.treeWidget.setMinimumSize(200,400)
         logDockWidget = QDockWidget("Model Attributes", self)
         logDockWidget.setObjectName("ModelAttibutesWidget")
         logDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea|
                                       Qt.RightDockWidgetArea)
         logDockWidget.setWidget(self.treeWidget)
         self.addDockWidget(Qt.LeftDockWidgetArea, logDockWidget)
-        self.addDockWidget(Qt.RightDockWidgetArea, consoleDockWidget)
         
         self.populateTree()
  
@@ -134,10 +143,10 @@ class MainWindow(QMainWindow):
        
         editMenu = self.menuBar().addMenu("&Edit")
 
-        varMenu = self.menuBar().addMenu("&Variable")
-        varAddAction = self.createAction("&Add Variable", self.varAdd, None, 
-                None, "Add a new variable to model")
-        varMenu.addAction(varAddAction)
+        modelMenu = self.menuBar().addMenu("&Optimization")
+        modelRunAction = self.createAction("&Run Optimization", self.runModel, None, 
+                None, "Run the optimizatin of the model for all phases")
+        modelMenu.addAction(modelRunAction)
 
 
         phaseMenu = self.menuBar().addMenu("&Phase")
@@ -147,6 +156,12 @@ class MainWindow(QMainWindow):
         phaseEditAction = self.createAction("&Edit Phase", self.phaseEdit, None, 
                 None, "Edit the selected phase")
         phaseMenu.addAction(phaseEditAction)
+        varAddAction = self.createAction("&Add Variable", self.varAdd, None, 
+                None, "Add a new variable to model")
+        phaseMenu.addAction(varAddAction)
+        varEditAction = self.createAction("&Edit Variable", self.varEdit, None, 
+                None, "Edit the selected variable")
+        phaseMenu.addAction(varEditAction)
 
         helpMenu = self.menuBar().addMenu("&Help")
         
@@ -172,7 +187,8 @@ class MainWindow(QMainWindow):
         newModelDialog = NewModelDlg()
         if newModelDialog.exec_():
             self.model.name = newModelDialog.modelName()
-        self.populateTree() 
+        self.populateTree()    
+        self.populateModelTable()
 
     def fileOpen(self):
         fileDialog = QFileDialog()
@@ -180,6 +196,7 @@ class MainWindow(QMainWindow):
         if not fn.isNull(): 
             self.model = pyrocks.open_model(fn)
             self.populateTree()
+            self.populateModelTable()
    
     def fileSave(self):
         fileDialog = QFileDialog()
@@ -187,9 +204,32 @@ class MainWindow(QMainWindow):
         if not fn.isNull(): 
             self.model = pyrocks.save_model(self.model, fn)
 
-    def varAdd(self):
-        print 'new var' 
+    def runModel(self):
+        all_phase_flag=True
+        # Addition of free variables
+        free_var = [#'SiO2', 
+        #            'TiO2', 
+                    'Al2O3', 
+        #            'Fe', 
+        #            'MnO', 
+                    'MgO', 
+                    'CaO', 
+        #            'Na2O', 
+        #            'K2O']
+                          ] 
+        for x in free_var:
+            if x != 'SiO2':
+                self.model.add_free_variable(x + '_pos', {'objfun': -100, x: 100}) 
+            self.model.add_free_variable(x + '_neg', {'objfun': -100, x: -100}) 
 
+        if all_phase_flag == True:
+            for x in self.model.phases:
+                self.consoleBrowser.insertPlainText('**********Maximizing %s*********\n' % x)
+                pyrocks.optimize_model(self.model, x, 10)
+        else:
+            pyrocks.optimize_model(model, maxPhase, 10)
+
+    # Functions to add and edit phases 
     def phaseAdd(self):
         addPhaseDialog = AddPhaseDlg()
         if addPhaseDialog.exec_():
@@ -209,6 +249,50 @@ class MainWindow(QMainWindow):
         self.populatePhaseOxides(editPhaseDialog, editPhase) 
         if editPhaseDialog.exec_():
             self.phaseStoreData(editPhaseDialog, editPhase)
+            self.populateTree() 
+            self.populateModelTable() 
+
+    # Functions to add and edit phase variables
+    def varAdd(self):
+        selPhase = unicode(self.treeWidget.currentItem().text(0))
+        addVariableDialog = AddVarDlg()
+        if addVariableDialog.exec_():
+            newVariable = unicode(addVariableDialog.variableName())
+            self.consoleBrowser.insertPlainText("New variable added: %s\n" % newVariable)
+            # Extract the table oxide components to add to variable 
+
+            test_model = addVariableDialog.tableWidget.model()  
+            data = []
+            for row in range(test_model.rowCount()):
+              #data.append([])
+              for column in range(test_model.columnCount()):
+                index = test_model.index(row, column)
+                if column==0: 
+                    oxide = str(test_model.data(index).toString())
+                if column==1:
+                    value = float(test_model.data(index).toFloat()[0])
+                    self.model.phases[selPhase].add_phase_variable(newVariable, oxide, value)
+            self.populateTree() 
+            self.populateModelTable() 
+    
+    def varEdit(self):
+        editVariableDialog = AddVarDlg()
+        editVariable = unicode(self.treeWidget.currentItem().text(0))
+        editPhase = unicode(self.treeWidget.currentItem().parent().text(0))
+        editVariableDialog.setVariableName(editVariable) 
+        self.populateVariableComp(editVariableDialog, editPhase, editVariable) 
+        if editVariableDialog.exec_():
+            test_model = editVariableDialog.tableWidget.model()  
+            data = []
+            for row in range(test_model.rowCount()):
+              #data.append([])
+              for column in range(test_model.columnCount()):
+                index = test_model.index(row, column)
+                if column==0: 
+                    oxide = str(test_model.data(index).toString())
+                if column==1:
+                    value = float(test_model.data(index).toFloat()[0])
+                    self.model.phases[editPhase].add_phase_variable(editVariable, oxide, value)
             self.populateTree() 
             self.populateModelTable() 
 
@@ -256,6 +340,27 @@ class MainWindow(QMainWindow):
         self.treeWidget.expandItem(modelTreeItem)
         self.treeWidget.expandItem(phaseTreeItem)
         self.treeWidget.resizeColumnToContents(0)
+
+    def populateVariableComp(self, dialog, phase, variable):
+        dialog.tableWidget.clear()
+        dialog.tableWidget.setSortingEnabled(False)
+        dialog.tableWidget.setRowCount(len(pyrocks.bulk))
+        headers = ["Oxide", "Weight Percent"]
+        dialog.tableWidget.setColumnCount(len(headers))
+        dialog.tableWidget.setHorizontalHeaderLabels(headers)
+
+        for row, comp in enumerate(pyrocks.bulk):
+            #print self.model.phases[newPhase].oxide_comp[oxide]
+            item = QTableWidgetItem(comp)
+            try:
+                item = QTableWidgetItem(QString("%6") \
+                    .arg(float(self.model.phases[phase].phase_variables[variable][comp]), 6, 'g', 5, QChar(" ")))
+                dialog.tableWidget.setItem(row, headers.index("Oxide"), QTableWidgetItem(comp))
+                dialog.tableWidget.setItem(row, headers.index("Weight Percent"), item)
+            except:
+                pass
+        dialog.tableWidget.resizeColumnsToContents()
+        dialog.tableWidget.setSortingEnabled(True)
 
     def populatePhaseOxides(self, addPhaseDialog, newPhase, selectedItem=None):
         selected = None
