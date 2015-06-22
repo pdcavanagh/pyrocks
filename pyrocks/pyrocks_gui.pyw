@@ -11,6 +11,7 @@ import ui_newmodeldlg
 import ui_addphasedlg
 import ui_addqxrddlg
 import ui_addvardlg
+import ui_addbulkdlg
 
 __version__ = "0.0.1"
 __author__ = "Patrick D. Cavanagh"
@@ -41,6 +42,14 @@ class AddVarDlg(QDialog,
         return self.__variableName
     def setVariableName(self, name):
         self.varNameLineEdit.setText(name)
+
+class AddBulkDlg(QDialog,
+                  ui_addbulkdlg.Ui_AddBulkDlg):
+    def __init__(self, parent=None):
+        super(AddBulkDlg, self).__init__(parent)
+        self.setupUi(self)
+    def accept(self):
+        QDialog.accept(self)
 
 class AddPhaseDlg(QDialog,
                   ui_addphasedlg.Ui_AddPhaseDlg):
@@ -132,6 +141,7 @@ class MainWindow(QMainWindow):
 
 
         # add actions to menu and toolbar
+        #*******File Menu*******
         fileMenu = self.menuBar().addMenu("&File")
         fileMenu.addAction(fileNewAction)
         fileOpenAction = self.createAction("&Open", self.fileOpen, None,
@@ -140,15 +150,23 @@ class MainWindow(QMainWindow):
         fileSaveAction = self.createAction("&Save", self.fileSave, None,
                 None, "Save the current model")
         fileMenu.addAction(fileSaveAction)
-       
+
+        #*******Edit Menu*******
         editMenu = self.menuBar().addMenu("&Edit")
 
-        modelMenu = self.menuBar().addMenu("&Optimization")
+        #*******Model Menu*******
+        modelMenu = self.menuBar().addMenu("&Model")
         modelRunAction = self.createAction("&Run Optimization", self.runModel, None, 
-                None, "Run the optimizatin of the model for all phases")
+                None, "Run the optimization of the model for all phases")
         modelMenu.addAction(modelRunAction)
+        bulkAddAction = self.createAction("&Add Bulk Composition", self.bulkAdd, None, 
+                None, "Add Bulk Composition for the Model")
+        modelMenu.addAction(bulkAddAction)
+        bulkEditAction = self.createAction("&Edit Bulk Composition", self.bulkEdit, None, 
+                None, "Edit Bulk Composition for the Model")
+        modelMenu.addAction(bulkEditAction)
 
-
+        #*******Phase Menu*******
         phaseMenu = self.menuBar().addMenu("&Phase")
         phaseAddAction = self.createAction("&Add Phase", self.phaseAdd, None, 
                 None, "Add a new phase to model")
@@ -163,10 +181,9 @@ class MainWindow(QMainWindow):
                 None, "Edit the selected variable")
         phaseMenu.addAction(varEditAction)
 
+        #*******Help Menu*******
         helpMenu = self.menuBar().addMenu("&Help")
         
-        #fileToolbar.addAction(fileNewAction)
-
     def createAction(self, text, slot=None, shortcut=None, icon=None,
                      tip=None, checkable=False, signal="triggered()"):
         action = QAction(text, self)
@@ -252,28 +269,48 @@ class MainWindow(QMainWindow):
             self.populateTree() 
             self.populateModelTable() 
 
-    # Functions to add and edit phase variables
-    def varAdd(self):
-        selPhase = unicode(self.treeWidget.currentItem().text(0))
-        addVariableDialog = AddVarDlg()
-        if addVariableDialog.exec_():
-            newVariable = unicode(addVariableDialog.variableName())
-            self.consoleBrowser.insertPlainText("New variable added: %s\n" % newVariable)
-            # Extract the table oxide components to add to variable 
+    def bulkAdd(self):
+        addBulkDialog = AddBulkDlg()
+        self.populateBulk(addBulkDialog) 
+        if addBulkDialog.exec_():
+            self.bulkStoreData(addBulkDialog)
+            self.populateTree() 
+            self.populateModelTable()
+            print self.model.bulk 
 
-            test_model = addVariableDialog.tableWidget.model()  
-            data = []
-            for row in range(test_model.rowCount()):
-              #data.append([])
-              for column in range(test_model.columnCount()):
-                index = test_model.index(row, column)
-                if column==0: 
-                    oxide = str(test_model.data(index).toString())
-                if column==1:
-                    value = float(test_model.data(index).toFloat()[0])
-                    self.model.phases[selPhase].add_phase_variable(newVariable, oxide, value)
+    def bulkEdit(self):
+        editBulkDialog = AddBulkDlg()
+        self.populateBulk(editBulkDialog) 
+        if editBulkDialog.exec_():
+            self.bulkStoreData(editBulkDialog)
             self.populateTree() 
             self.populateModelTable() 
+
+    # Functions to add and edit phase variables
+    def varAdd(self):
+        if self.treeWidget.currentItem() is not None:
+            selPhase = unicode(self.treeWidget.currentItem().text(0))
+            addVariableDialog = AddVarDlg()
+            if addVariableDialog.exec_():
+                newVariable = unicode(addVariableDialog.variableName())
+                self.consoleBrowser.insertPlainText("New variable added: %s\n" % newVariable)
+                # Extract the table oxide components to add to variable 
+
+                test_model = addVariableDialog.tableWidget.model()  
+                data = []
+                for row in range(test_model.rowCount()):
+                  #data.append([])
+                  for column in range(test_model.columnCount()):
+                    index = test_model.index(row, column)
+                    if column==0: 
+                        oxide = str(test_model.data(index).toString())
+                    if column==1:
+                        value = float(test_model.data(index).toFloat()[0])
+                        self.model.phases[selPhase].add_phase_variable(newVariable, oxide, value)
+                self.populateTree() 
+                self.populateModelTable() 
+        else:
+            self.consoleBrowser.insertPlainText("Please select a phase to add a variable\n")
     
     def varEdit(self):
         editVariableDialog = AddVarDlg()
@@ -295,6 +332,20 @@ class MainWindow(QMainWindow):
                     self.model.phases[editPhase].add_phase_variable(editVariable, oxide, value)
             self.populateTree() 
             self.populateModelTable() 
+
+    def bulkStoreData(self, dlg):
+        # Extract the table oxide components to add to phase 
+        test_model = dlg.tableWidget.model()  
+        data = []
+        for row in range(test_model.rowCount()):
+          data.append([])
+          for column in range(test_model.columnCount()):
+            index = test_model.index(row, column)
+            if column==0: 
+                oxide = str(test_model.data(index).toString())
+            if column==1:
+                value = float(test_model.data(index).toFloat()[0])
+                self.model.add_bulk(oxide, value)
 
     def phaseStoreData(self, dlg, newPhase):
         self.model.phases[newPhase].add_qxrd(dlg.qxrd())
@@ -359,6 +410,24 @@ class MainWindow(QMainWindow):
                 dialog.tableWidget.setItem(row, headers.index("Weight Percent"), item)
             except:
                 pass
+        dialog.tableWidget.resizeColumnsToContents()
+        dialog.tableWidget.setSortingEnabled(True)
+
+    def populateBulk(self, dialog):
+        dialog.tableWidget.clear()
+        dialog.tableWidget.setSortingEnabled(False)
+        dialog.tableWidget.setRowCount(len(self.model.bulk))
+        headers = ["Oxide", "Weight Percent"]
+        dialog.tableWidget.setColumnCount(len(headers))
+        dialog.tableWidget.setHorizontalHeaderLabels(headers)
+
+        for row, oxide in enumerate(self.model.bulk):
+            #print self.model.phases[newPhase].oxide_comp[oxide]
+            item = QTableWidgetItem(oxide)
+            item = QTableWidgetItem(QString("%6") \
+                .arg(float(self.model.bulk[oxide]), 6, 'g', 5, QChar(" ")))
+            dialog.tableWidget.setItem(row, 0, QTableWidgetItem(oxide))
+            dialog.tableWidget.setItem(row, 1, item)
         dialog.tableWidget.resizeColumnsToContents()
         dialog.tableWidget.setSortingEnabled(True)
 
