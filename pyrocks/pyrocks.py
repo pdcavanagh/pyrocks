@@ -1,4 +1,5 @@
 #/usr/local/python
+import time
 import re
 import logging
 import urllib2
@@ -6,6 +7,24 @@ import numpy as np
 import pulp
 import CifFile as cif
 import pickle
+import csv
+
+class Result:
+    def __init__(self, name):
+        self.opt = name
+        self.obj_fun = 0.0
+        self.opt_var = ''
+        self.var_value = 0.0
+        self.obj_fun_result = 0.0
+
+    def add_variable(self, var_name):
+        self.opt_var = var_name    
+
+    def add_value(self, var_value):
+        self.var_value=var_value
+                    
+    def add_obj_fun_result(self, objValue):
+        self.obj_fun_result = objValue
 
 class Model:
     def __init__(self, name):
@@ -22,8 +41,9 @@ class Model:
                      'Na2O':  0,
                      'K2O':   0,
                      'SO3':   0,
-                     'Cl':    0,
-                     'H2O':   0}
+                     'Cl':    0}
+#                     'H2O':   0,
+#                     'F':     0}
  
     # Fuction to add all mineral phases used in model
     def add_phase(self, phase):
@@ -47,7 +67,160 @@ def open_model(fn):
     pkl_file.close()
     return model
 
-# Minearl Phase Class
+def save_results(model, res):
+    fn_out = model.name + '_out-test.csv'
+    abun_fn = model.name + '_abun_out_' + str(time.localtime().tm_year) + \
+              '{:02d}'.format(time.localtime().tm_mon) + \
+              '{:02d}'.format(time.localtime().tm_mday) + \
+              str(time.localtime().tm_hour) + str(time.localtime().tm_min) + '.csv'
+
+    # create a max and min list
+    max_dict = {}
+    min_dict = {}
+    phase_min_dict = {}
+   
+    # Record the constraints for the mineral phases 
+    lowBound ={} 
+    upBound ={} 
+    for x in model.phases:
+        if model.phases[x].qxrd - model.phases[x].qxrd_error >= 0:
+            lowBound[x] = model.phases[x].qxrd - model.phases[x].qxrd_error
+            upBound[x] = model.phases[x].qxrd + model.phases[x].qxrd_error
+        else:
+            lowBound[x] = 0.0    
+            upBound[x] = model.phases[x].qxrd + model.phases[x].qxrd_error
+        #print '%s %f' % (x, lowBound[x])
+        #print '%s %f' % (x, upBound[x])
+ 
+    for x in res:
+        print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
+        phase=str(x.opt_var)[8:] #strip phase name from variable, remove 'Phase_X_'
+
+        # Encounter optimization value for first time, initialize to first value
+        if x.opt_var not in min_dict:
+            min_dict[x.opt_var] = x.var_value
+
+        # Create list of max values for each phase optimization
+        if x.opt==phase:
+            max_dict[x.opt]=x.var_value
+
+        # Update the list of min results
+        if x.var_value < min_dict[x.opt_var]:
+            min_dict[x.opt_var] = x.var_value
+    
+    for x in min_dict:
+        if x[0:8]=='Phase_X_':
+            phase_min_dict[x[8:]]=min_dict[x]
+    print '%20s%14s%14s%14s%14s' % ('phase','lower bounds','min','max','upper bounds') 
+    for x in max_dict:
+        print '%20s%14f%14f%14f%14f' % (x, lowBound[x], phase_min_dict[x], max_dict[x], upBound[x])
+
+            
+    #for x in phase_min_dict:
+        #print x, phase_min_dict[x]
+
+    with open(fn_out, 'w') as csvfile:
+        fieldnames = ['Opt', 'Mineral or Variable', 'Wt Percent']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+            
+        for x in res:
+            writer.writerow({'Opt': x.opt, 'Mineral or Variable': x.opt_var, 'Wt Percent': x.var_value})
+
+    with open(abun_fn, 'w') as csvfile:
+        fieldnames = ['Phase', 'Lower Bound', 'Minimum', 'Maximum', 'Upper Bound']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+            
+        for x in max_dict:
+            writer.writerow({'Phase': x, 'Lower Bound': lowBound[x], 
+                'Minimum': phase_min_dict[x], 'Maximum': max_dict[x], 
+                'Upper Bound': upBound[x]})
+
+def add_amorph_comp(mdl, comp_name):
+    if comp_name=='default': 
+        # Rocknest amorphous componenet added 2/22/16
+        # Add amorphous oxide weight percent to phases of model
+        mdl.phases['amorphous'].set_oxide_comp('SiO2', 37.2)
+        mdl.phases['amorphous'].set_oxide_comp('TiO2', 2.06)
+        mdl.phases['amorphous'].set_oxide_comp('Al2O3', 6.04)
+        mdl.phases['amorphous'].set_oxide_comp('Fe', 23.14)
+        mdl.phases['amorphous'].set_oxide_comp('MnO', 0.91)
+        mdl.phases['amorphous'].set_oxide_comp('MgO', 4.86)
+        mdl.phases['amorphous'].set_oxide_comp('CaO', 5.61)
+        mdl.phases['amorphous'].set_oxide_comp('Na2O', 3.56)
+        mdl.phases['amorphous'].set_oxide_comp('K2O', 0.89)
+        mdl.phases['amorphous'].set_oxide_comp('SO3', 11.01)
+        # Add amorphous oxide weight percent delta values
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', 3.72)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', 0.21)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', 0.6)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', 2.31)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', 0.09)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', 0.49)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', 0.56)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', 0.36)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', 0.09)
+    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 1.1)
+        mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
+    elif comp_name=='dehouck':
+        # Rocknest amorphous componenet added 2/22/16
+        # Add amorphous oxide weight percent to phases of model
+        mdl.phases['amorphous'].set_oxide_comp('SiO2', 36.1)
+        mdl.phases['amorphous'].set_oxide_comp('TiO2', 2.3)
+        mdl.phases['amorphous'].set_oxide_comp('Al2O3', 1.8)
+        mdl.phases['amorphous'].set_oxide_comp('Cr2O3', 1.4)
+        mdl.phases['amorphous'].set_oxide_comp('Fe', 24.7)
+        mdl.phases['amorphous'].set_oxide_comp('MnO', 0.8)
+        mdl.phases['amorphous'].set_oxide_comp('MgO', 8.8)
+        mdl.phases['amorphous'].set_oxide_comp('CaO', 6.9)
+        mdl.phases['amorphous'].set_oxide_comp('Na2O', 4.8)
+        mdl.phases['amorphous'].set_oxide_comp('K2O', 0.7)
+        mdl.phases['amorphous'].set_oxide_comp('P2O5', 3.2)
+        mdl.phases['amorphous'].set_oxide_comp('SO3', 2.2)
+        mdl.phases['amorphous'].set_oxide_comp('Cl', 4.2)
+        # Add amorphous oxide weight percent delta values
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', 7.8)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', 0.7)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', 2.7)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', 10.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', 0.1)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', 5.8)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', 3.7)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', 1.2)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', 0.5)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_P2O5', 'P2O5', 0.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 3.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', 0.4)
+        mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
+    elif comp_name=='SapCa-1':
+    #    # SapCa-1 Model amorphous
+    #    # Add amorphous oxide weight percent to phases of model
+        mdl.phases['amorphous'].set_oxide_comp('SiO2', 30.1)
+        mdl.phases['amorphous'].set_oxide_comp('TiO2', 2.03)
+        mdl.phases['amorphous'].set_oxide_comp('Al2O3', 9.08)
+        mdl.phases['amorphous'].set_oxide_comp('Fe', 33.46)
+        mdl.phases['amorphous'].set_oxide_comp('MnO', .66)
+        mdl.phases['amorphous'].set_oxide_comp('MgO', 0.01)
+        mdl.phases['amorphous'].set_oxide_comp('CaO', 6.46)
+        mdl.phases['amorphous'].set_oxide_comp('Na2O', 3.68)
+        mdl.phases['amorphous'].set_oxide_comp('K2O', 0.56)
+        mdl.phases['amorphous'].set_oxide_comp('SO3', 8.72)
+        # Add amorphous oxide weight percent delta values
+        amorph_scale = 1.0
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', amorph_scale*3.72)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', amorph_scale*0.21)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', amorph_scale*0.6)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', amorph_scale*2.31)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', amorph_scale*0.09)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', amorph_scale*0.49)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', amorph_scale*0.56)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', amorph_scale*0.36)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', amorph_scale*0.09)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', amorph_scale*1.1)
+        mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100.0', 0.0, 0.0)
+
+# Mineral Phase Class
 # Contains all information relevant for a phase to be added to model
 # Attributes:
 #   Name 
@@ -72,7 +245,8 @@ class Phase:
                            'K2O':  0,
                            'SO3':  0,
                            'Cl':   0,
-                           'H2O':  0}
+                           'H2O':  0,
+                           'F':    0}
         #self.delta_oxides = {}
         self.phase_variables = {}
 
@@ -113,7 +287,8 @@ class Oxides:
                         'K2O':  0,
                         'SO3':  0,
                         'Cl':  0,
-                        'H2O':  0}
+                        'H2O':  0,
+                        'F':   0}
         for x,y in oxides.items():
             self.oxides[x] = y    
         def set_oxide(self, oxide_name, value):
@@ -131,8 +306,8 @@ bulk = ['SiO2',
         'K2O',
         'SO3', 
         'Cl', 
-        'H2O'] 
-
+        'H2O', 
+        'F']
 
 # Dictionary element to oxide 
 elem2oxide = {'Si': 'SiO2',
@@ -170,15 +345,19 @@ def is_number(s):
     except ValueError:
         return False
 
-def getAPXSData(url):
-    # create a new Urllib2 Request object	
-    req = urllib2.Request(url)
-    # make the request and print the results
-    res = urllib2.urlopen(req)
+def getAPXSData(url, web_flag):
+    if web_flag==True:
+        # create a new Urllib2 Request object	
+        req = urllib2.Request(url)
+        # make the request and print the results
+        res = urllib2.urlopen(req)
+    else:
+        res = url
     data_array = np.genfromtxt(res, delimiter=',', skip_header=True, names=True, dtype=None )
     for x in data_array:
         x[0] = x[0].strip()
-    return data_array 
+    return data_array
+         
 
 # Functions for seperating a chemical forumla into atom components
 # Returns list of elements and list of stoiciometric coefficients
@@ -206,61 +385,15 @@ def form_split(form_str):
                 flag=False
     return element, elem_num
 
-def main_loop():
-    logging.basicConfig(level=logging.DEBUG, 
-                        format='%(asctime)s - %(levelname)s - %(message)s')
+def saveResults(resultVars):
+    for v in resultVars:
+        #if v.name != '__dummy':
+            #if v.name[0:8] == 'Phase_X_':
+                logging.debug('%-25s = %6.4f' % (v.name, v.varValue))
     
-    # retrieve .CIF filename from command line
-    name = cf['global']['_chemical_name_mineral']
-    formula = cf['global']['_chemical_formula_sum']
-    
-    logging.debug('test: %s %s' % (name, formula))
-    
-    # Parse formula string from CIF
-    [element, stoich_coeff] = form_split(formula)
-    formula = dict(zip(element, stoich_coeff))
-    
-    logging.debug('elements: %s' % element)
-    logging.debug('stoich: %s' % stoich_coeff)
-    logging.debug('%s' % formula)
-    
-    # Element dictionary template
-    element_temp = dict.fromkeys(['Si','Ca','Na','Al','O','Mg','H','K'])
-    oxide = dict.fromkeys(['SiO2','CaO','Na2O','Al2O3'])
-    
-    # Calculate the weight percent of each oxide in phase
-    sum = 0
-    
-    for x,y in formula.items():
-        temp1 = atomic_wt[x] * y 
-        element_temp[x] = atomic_wt['O'] * num_oxy[x] + temp1
-        if x != 'O':
-            sum = element_temp[x] + sum
-    
-    for x in element_temp:
-        if x != 'O' and element_temp[x]!=None: 
-            oxide[elem2oxide[x]] = element_temp[x]/sum
-    
-    for x,y in oxide.items():
-        if y!=None: 
-            print '%5s: %8.3f' % (x,y*100)
-    
-    apxs_url = 'http://pds-geosciences.wustl.edu/msl/msl-m-apxs-4_5-rdr-v1/mslapx_1xxx/data/sol00288/apb_423020067rwp02880060082_______p1.csv'
-    
-    testAPXSdata = getAPXSData(apxs_url)
-
-    model_name = 'Rocknest'
-
-    # Begin of linear programming code
-    prob = pulp.LpProblem(model_name, LpMinimize) 
-
-    # Objective function
-    #prob += lpSum([])
-
-    #prob += lpSum([
 
 #------------- Creation of the PuLP optimization -------------------------------
-def optimize_model(model, maxPhase, objFunWt): 
+def optimize_phase(model, maxPhase, objFunWt): 
     variables = []   # List of all optimization variables
     phase_abun = {}  # Dictionary of QXRD abudances 
     constraints = {} # Dictionary of all constraints (rows)
@@ -308,9 +441,9 @@ def optimize_model(model, maxPhase, objFunWt):
     # Constraint for phase fraction is that all phases add to 1
     for x in variables:
         if x[0] == 'X':
-            phase_frac[x] = 1
+            phase_frac[x] = 1.0
         else:
-            phase_frac[x] = 0
+            phase_frac[x] = 0.0
     
     # Create the 'prob' variable to contain the problem data
     prob = pulp.LpProblem(model.name, pulp.LpMaximize)
@@ -325,16 +458,20 @@ def optimize_model(model, maxPhase, objFunWt):
 
     # Set the bounding conditions for all phases based on QXRD error
     for x in model.phases:
-        if model.phases[x].qxrd - model.phases[x].qxrd_error >= 0:
+        if model.phases[x].qxrd - model.phases[x].qxrd_error < 0:
+            phase_vars['X_' + x].lowBound = 0.0
+        else:
             phase_vars['X_' + x].lowBound = model.phases[x].qxrd - model.phases[x].qxrd_error
         phase_vars['X_' + x].upBound = model.phases[x].qxrd + model.phases[x].qxrd_error
         #print x,phase_vars['X_' + x].lowBound, phase_vars['X_' + x].upBound 
-    # The objective function is added to 'prob' first
+
+    # Add objective function to 'prob' first
     prob += pulp.lpSum([objfun[i]*phase_vars[i] for i in variables]), "Objective function for maximization of particular phase"
     
-    # The constraints are added to 'prob'
+    # Add constraints to 'prob'
     prob += pulp.lpSum([phase_frac[i] * phase_vars[i] for i in variables]) == 1, "Phases sum to 100%"
 
+    # Add bulk chemistry
     for x,y in model.bulk.items():
         try:
             prob += pulp.lpSum([constraints[x][i] * phase_vars[i] for i in variables]) == y, "%s APXS" % x
@@ -357,18 +494,56 @@ def optimize_model(model, maxPhase, objFunWt):
     
     # The problem is solved using PuLP's choice of Solver
     prob.solve()
-    
-    # The status of the solution is printed to the screen
-    print "Status:", pulp.LpStatus[prob.status]
-    
-    # Each of the variables is printed with it's resolved optimum value
-    for v in prob.variables():
-        if v.name != '__dummy':
-            if v.name[0:8] == 'Phase_X_':
-                print '%-25s = %6.4f' % (v.name, v.varValue)
-    
-    # The optimised objective function value is printed to the screen    
-    print "optimised objective function value = ", pulp.value(prob.objective)
+    #print prob
+    return(pulp.LpStatus[prob.status], prob.variables(), pulp.value(prob.objective))
+
+def optimize_routine(model, objFunWt, all_phases_flag, maxPhase):
+    result_output_list=[]
+    # Run the optimization for the selected phase to maximize
+    if all_phases_flag == True:
+        fn_out = model.name + '_out.csv'
+        with open(fn_out, 'w') as csvfile:
+            fieldnames = ['Opt', 'Mineral or Variable', 'Wt Percent']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for x in model.phases:
+                print '**********Maximizing %s*********' % x
+                status, results, objValue = optimize_phase(model, x, objFunWt)
+                # The status of the solution is printed to the screen
+                logging.debug("Status: %s" % status)
+  
+                # Each of the variables is printed with it's resolved optimum value
+                for y in results:
+                    temp_result = Result(x)     
+                    temp_result.add_variable(y.name)
+                    temp_result.add_value(y.varValue)
+                    #logging.debug('%-25s = %6.4f' % (y.name, y.varValue))
+                    result_output_list.append(temp_result)
+
+                try:
+                    logging.debug('Objective Function Value: %2.4f' % objValue)
+                    temp_result.add_obj_fun_result(objValue)
+                except:
+                    logging.debug('Objective function value unavailable')
+#        for x in result_output_list:
+#            print x.opt
+#            print x.var_value
+#            print x.opt_var
+        return result_output_list
+
+    else:
+        status, results, objValue = optimize_phase(model, maxPhase, objFunWt)
+        # The status of the solution is printed to the screen
+        logging.debug("Status: %s" % status)
+
+        # Each of the variables is printed with it's resolved optimum value
+        for x in results:
+            if x.name[0:8] == "Phase_X_":
+                logging.debug('%-25s = %6.4f' % (x.name, x.varValue))
+        try:
+            logging.debug('Objective Function Value: %2.4f' % objValue)
+        except:
+            logging.debug('Objective function value unavailable')
 
 
 if __name__ == "__main__":
@@ -379,4 +554,3 @@ if __name__ == "__main__":
         print "Please provide a filename: python pyrocks.py FILENAME"
     else:
         cf = cif.ReadCif(fn)
-        main_loop()
