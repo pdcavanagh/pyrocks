@@ -31,17 +31,19 @@ class Model:
         self.name = name
         self.phases = {}
         self.free_variables = {}
-        self.bulk = {'SiO2':  0,
-                     'TiO2':  0,
-                     'Al2O3': 0, 
-                     'Fe':    0,
-                     'MnO':   0,
-                     'MgO':   0,
-                     'CaO':   0,
-                     'Na2O':  0,
-                     'K2O':   0,
-                     'SO3':   0,
-                     'Cl':    0}
+        self.bulk = {'SiO2':  0.0,
+                     'TiO2':  0.0,
+                     'Al2O3': 0.0, 
+                     'Cr2O3': 0.0,
+                     'Fe':    0.0,
+                     'MnO':   0.0,
+                     'MgO':   0.0,
+                     'CaO':   0.0,
+                     'Na2O':  0.0,
+                     'K2O':   0.0,
+                     'SO3':   0.0,
+                     'P2O5':  0.0,
+                     'Cl':    0.0}
 #                     'H2O':   0,
 #                     'F':     0}
  
@@ -72,13 +74,15 @@ def save_results(model, res):
     abun_fn = model.name + '_abun_out_' + str(time.localtime().tm_year) + \
               '{:02d}'.format(time.localtime().tm_mon) + \
               '{:02d}'.format(time.localtime().tm_mday) + \
-              str(time.localtime().tm_hour) + str(time.localtime().tm_min) + '.csv'
+              str(time.localtime().tm_hour) + \
+              '{:02d}'.format(time.localtime().tm_min) + '.csv'
 
     # create a max and min list
     max_dict = {}
     min_dict = {}
     phase_min_dict = {}
-   
+    amorph_comp = {}  
+ 
     # Record the constraints for the mineral phases 
     lowBound ={} 
     upBound ={} 
@@ -93,7 +97,10 @@ def save_results(model, res):
         #print '%s %f' % (x, upBound[x])
  
     for x in res:
-        print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
+        if x.opt=='amorphous':
+            print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
+            if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
+                amorph_comp[str(x.opt_var)[19:]]=x.var_value
         phase=str(x.opt_var)[8:] #strip phase name from variable, remove 'Phase_X_'
 
         # Encounter optimization value for first time, initialize to first value
@@ -107,6 +114,12 @@ def save_results(model, res):
         # Update the list of min results
         if x.var_value < min_dict[x.opt_var]:
             min_dict[x.opt_var] = x.var_value
+
+    # Calculate the amorphous component composition from the amorphous maximization
+    for y in amorph_comp:
+        wt_perc = model.phases['amorphous'].oxide_comp[y] 
+        delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + str(y)]
+        print '%s \t %5.2f' % (y, wt_perc+amorph_comp[y]*delta[y]) 
     
     for x in min_dict:
         if x[0:8]=='Phase_X_':
@@ -137,6 +150,87 @@ def save_results(model, res):
                 'Minimum': phase_min_dict[x], 'Maximum': max_dict[x], 
                 'Upper Bound': upBound[x]})
 
+def add_clay_comp(mdl, comp_name):
+    if comp_name=='default': 
+        # Add smectite
+        # saponite data from webmineral.com
+        # Add amorphous oxide weight percent to phases of model
+        model.phases['smectite'].set_oxide_comp('SiO2', 50.79)
+        model.phases['smectite'].set_oxide_comp('Al2O3', 6.83)
+        model.phases['smectite'].set_oxide_comp('Fe', 35.61)
+        model.phases['smectite'].set_oxide_comp('MgO', 1.11)
+        model.phases['smectite'].set_oxide_comp('CaO', 2.95)
+        model.phases['smectite'].set_oxide_comp('Na2O', 0.0)
+    #    model.phases['smectite'].set_oxide_comp('H2O', )
+        # Add smectite oxide weight percent delta values
+        # random error ranges
+        model.phases['smectite'].add_phase_variable('DX_smectite_SiO2', 'SiO2', 3.72)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Al2O3', 'Al2O3', 0.6)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Fe', 'Fe', 2.31)
+        model.phases['smectite'].add_phase_variable('DX_smectite_MgO', 'MgO', 0.49)
+        model.phases['smectite'].add_phase_variable('DX_smectite_CaO', 'CaO', 0.56)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Na2O', 'Na2O', 0.36)
+    #    model.phases['smectite'].add_phase_variable('DX_smectite_H2O', 'H2O', 1.1)
+        model.phases['smectite'].add_phase_variable('smectite_oxides=100.0', 0.0, 0.0)
+    
+    elif comp_name=='nontronite':
+        # Nontronite from Spokane, WA - Manito (Koster, 1999) Clay Minerals
+        model.phases['smectite'].set_oxide_comp('SiO2', 44.8)
+        model.phases['smectite'].set_oxide_comp('TiO2', 0.17)
+        model.phases['smectite'].set_oxide_comp('Al2O3', 7.8)
+        model.phases['smectite'].set_oxide_comp('Cr2O3', 0.0)
+        model.phases['smectite'].set_oxide_comp('Fe', 30.52)
+        model.phases['smectite'].set_oxide_comp('MnO', 0.0)
+        model.phases['smectite'].set_oxide_comp('MgO', 0.4)
+        model.phases['smectite'].set_oxide_comp('CaO', 0.03)
+        model.phases['smectite'].set_oxide_comp('Na2O', 3.17)
+        model.phases['smectite'].set_oxide_comp('K2O', 0.1)
+        model.phases['smectite'].set_oxide_comp('P2O5', 0.0)
+        model.phases['smectite'].set_oxide_comp('SO3', 0.0)
+        model.phases['smectite'].set_oxide_comp('Cl', 0.0)
+    #    model.phases['smectite'].set_oxide_comp('H2O', )
+        # Add smectite oxide weight percent delta values
+        # random error ranges
+        model.phases['smectite'].add_phase_variable('DX_smectite_SiO2', 'SiO2', 3.72)
+        model.phases['smectite'].add_phase_variable('DX_smectite_TiO2', 'TiO2', 0.1)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Al2O3', 'Al2O3', 0.6)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Fe', 'Fe', 2.31)
+        model.phases['smectite'].add_phase_variable('DX_smectite_MgO', 'MgO', 0.49)
+        model.phases['smectite'].add_phase_variable('DX_smectite_CaO', 'CaO', 0.56)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Na2O', 'Na2O', 0.36)
+    #    model.phases['smectite'].add_phase_variable('DX_smectite_H2O', 'H2O', 1.1)
+        model.phases['smectite'].add_phase_variable('smectite_oxides=100.0', 0.0, 0.0)
+    
+    elif comp_name=='saponite':
+        # Add smectite
+        # saponite data from Dehouck, 2014 ref. from Treiman AMNH 2014
+        # Griffith Saponite 1
+        # Add amorphous oxide weight percent to phases of model
+        model.phases['smectite'].set_oxide_comp('SiO2', 50.21)
+        model.phases['smectite'].set_oxide_comp('TiO2', 0.05)
+        model.phases['smectite'].set_oxide_comp('Al2O3', 8.91)
+        model.phases['smectite'].set_oxide_comp('Cr2O3', 0.01)
+        model.phases['smectite'].set_oxide_comp('Fe', 17.24)
+        model.phases['smectite'].set_oxide_comp('MnO', 0.1)
+        model.phases['smectite'].set_oxide_comp('MgO', 20.73)
+        model.phases['smectite'].set_oxide_comp('CaO', 2.62)
+        model.phases['smectite'].set_oxide_comp('Na2O', 0.09)
+        model.phases['smectite'].set_oxide_comp('K2O', 0.03)
+        model.phases['smectite'].set_oxide_comp('P2O5', 0.0)
+        model.phases['smectite'].set_oxide_comp('SO3', 0.0)
+        model.phases['smectite'].set_oxide_comp('Cl', 0.0)
+    #    model.phases['smectite'].set_oxide_comp('H2O', )
+        # Add smectite oxide weight percent delta values
+        # random error ranges
+        model.phases['smectite'].add_phase_variable('DX_smectite_SiO2', 'SiO2', 3.72)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Al2O3', 'Al2O3', 0.6)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Fe', 'Fe', 2.31)
+        model.phases['smectite'].add_phase_variable('DX_smectite_MgO', 'MgO', 0.49)
+        model.phases['smectite'].add_phase_variable('DX_smectite_CaO', 'CaO', 0.56)
+        model.phases['smectite'].add_phase_variable('DX_smectite_Na2O', 'Na2O', 0.36)
+    #    model.phases['smectite'].add_phase_variable('DX_smectite_H2O', 'H2O', 1.1)
+        model.phases['smectite'].add_phase_variable('smectite_oxides=100.0', 0.0, 0.0)
+
 def add_amorph_comp(mdl, comp_name):
     if comp_name=='default': 
         # Rocknest amorphous componenet added 2/22/16
@@ -151,19 +245,33 @@ def add_amorph_comp(mdl, comp_name):
         mdl.phases['amorphous'].set_oxide_comp('Na2O', 3.56)
         mdl.phases['amorphous'].set_oxide_comp('K2O', 0.89)
         mdl.phases['amorphous'].set_oxide_comp('SO3', 11.01)
+        mdl.phases['amorphous'].set_oxide_comp('Cl', 0.1)
         # Add amorphous oxide weight percent delta values
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', 3.72)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', 0.21)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', 0.6)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', 2.31)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', 0.09)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', 0.49)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', 0.56)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', 0.36)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', 0.09)
-    #    mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 1.1)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', 3.72)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', 1.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', -2.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', 5.1)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', 0.5)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', -4.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', -1.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', -3.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', 0.5)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 3.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', 1.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_P2O5', 'P2O5', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 0.0)
+#        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', 0.0)
         mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
-    elif comp_name=='dehouck':
+    elif comp_name=='dehouck-griffith-sap1-30':
         # Rocknest amorphous componenet added 2/22/16
         # Add amorphous oxide weight percent to phases of model
         mdl.phases['amorphous'].set_oxide_comp('SiO2', 36.1)
@@ -193,6 +301,93 @@ def add_amorph_comp(mdl, comp_name):
         mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 3.0)
         mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', 0.4)
         mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
+    elif comp_name=='dehouck-griffith-sap1-45':
+        # Add amorphous oxide weight percent to phases of model
+        mdl.phases['amorphous'].set_oxide_comp('SiO2', 39.4)
+        mdl.phases['amorphous'].set_oxide_comp('TiO2', 1.7)
+        mdl.phases['amorphous'].set_oxide_comp('Al2O3', 5.0)
+        mdl.phases['amorphous'].set_oxide_comp('Cr2O3', 1.0)
+        mdl.phases['amorphous'].set_oxide_comp('Fe', 23.6)
+        mdl.phases['amorphous'].set_oxide_comp('MnO', 0.6)
+        mdl.phases['amorphous'].set_oxide_comp('MgO', 9.1)
+        mdl.phases['amorphous'].set_oxide_comp('CaO', 6.6)
+        mdl.phases['amorphous'].set_oxide_comp('Na2O', 3.9)
+        mdl.phases['amorphous'].set_oxide_comp('K2O', 0.6)
+        mdl.phases['amorphous'].set_oxide_comp('P2O5', 2.1)
+        mdl.phases['amorphous'].set_oxide_comp('SO3', 2.4)
+        mdl.phases['amorphous'].set_oxide_comp('Cl', 2.9)
+        # Add amorphous oxide weight percent delta values
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', 4.4)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', 0.4)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', 2.4)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', 5.2)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', 0.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', 3.15)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', 1.95)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', 0.85)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', 0.25)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_P2O5', 'P2O5', 0.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 2.15)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', 0.2)
+        mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
+    elif comp_name=='dehouck-griffith-sap2-30':
+        # Add amorphous oxide weight percent to phases of model
+        mdl.phases['amorphous'].set_oxide_comp('SiO2', 37.2)
+        mdl.phases['amorphous'].set_oxide_comp('TiO2', 2.2) 
+        mdl.phases['amorphous'].set_oxide_comp('Al2O3', 1.0)
+        mdl.phases['amorphous'].set_oxide_comp('Cr2O3', 1.4)
+        mdl.phases['amorphous'].set_oxide_comp('Fe', 24.7)
+        mdl.phases['amorphous'].set_oxide_comp('MnO', 0.7)
+        mdl.phases['amorphous'].set_oxide_comp('MgO', 10.4)
+        mdl.phases['amorphous'].set_oxide_comp('CaO', 5.8)
+        mdl.phases['amorphous'].set_oxide_comp('Na2O', 4.4)
+        mdl.phases['amorphous'].set_oxide_comp('K2O', 0.7)
+        mdl.phases['amorphous'].set_oxide_comp('P2O5', 3.2)
+        mdl.phases['amorphous'].set_oxide_comp('SO3', 2.2)
+        mdl.phases['amorphous'].set_oxide_comp('Cl', 4.2)
+        # Add amorphous oxide weight percent delta values
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', 7.45)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', 0.7)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', 2.25)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', 9.75)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', 0.15)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', 5.1)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', 3.2)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', 1.05)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', 0.45)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_P2O5', 'P2O5', 0.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 2.95)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', 0.35)
+        mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
+    elif comp_name=='dehouck-griffith-sap2-45':
+        # Add amorphous oxide weight percent to phases of model
+        mdl.phases['amorphous'].set_oxide_comp('SiO2', 40.0)
+        mdl.phases['amorphous'].set_oxide_comp('TiO2', 1.6)
+        mdl.phases['amorphous'].set_oxide_comp('Al2O3', 4.6)
+        mdl.phases['amorphous'].set_oxide_comp('Cr2O3', 1.0)
+        mdl.phases['amorphous'].set_oxide_comp('Fe', 24.0)
+        mdl.phases['amorphous'].set_oxide_comp('MnO', 0.5)
+        mdl.phases['amorphous'].set_oxide_comp('MgO', 9.9)
+        mdl.phases['amorphous'].set_oxide_comp('CaO', 6.0)
+        mdl.phases['amorphous'].set_oxide_comp('Na2O', 3.7)
+        mdl.phases['amorphous'].set_oxide_comp('K2O', 0.6)
+        mdl.phases['amorphous'].set_oxide_comp('P2O5', 2.1)
+        mdl.phases['amorphous'].set_oxide_comp('SO3', 2.4)
+        mdl.phases['amorphous'].set_oxide_comp('Cl', 2.9)
+        # Add amorphous oxide weight percent delta values
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', 4.2)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', 0.4)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', 2.3)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', 5.2)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', 0.1)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', 2.9)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', 1.8)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', 0.8)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', 0.3)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_P2O5', 'P2O5', 0.0)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', 1.2)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', 0.2)
+        mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
     elif comp_name=='SapCa-1':
     #    # SapCa-1 Model amorphous
     #    # Add amorphous oxide weight percent to phases of model
@@ -207,17 +402,17 @@ def add_amorph_comp(mdl, comp_name):
         mdl.phases['amorphous'].set_oxide_comp('K2O', 0.56)
         mdl.phases['amorphous'].set_oxide_comp('SO3', 8.72)
         # Add amorphous oxide weight percent delta values
-        amorph_scale = 1.0
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', amorph_scale*3.72)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', amorph_scale*0.21)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', amorph_scale*0.6)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', amorph_scale*2.31)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', amorph_scale*0.09)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', amorph_scale*0.49)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', amorph_scale*0.56)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', amorph_scale*0.36)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', amorph_scale*0.09)
-        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', amorph_scale*1.1)
+        scl = 1.0
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SiO2', 'SiO2', scl*3.72)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_TiO2', 'TiO2', scl*0.21)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Al2O3', 'Al2O3', scl*0.6)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Fe', 'Fe', scl*2.31)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MnO', 'MnO', scl*0.09)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_MgO', 'MgO', scl*0.49)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_CaO', 'CaO', scl*0.56)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Na2O', 'Na2O', scl*0.36)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_K2O', 'K2O', scl*0.09)
+        mdl.phases['amorphous'].add_phase_variable('DX_amorphous_SO3', 'SO3', scl*1.1)
         mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100.0', 0.0, 0.0)
 
 # Mineral Phase Class
