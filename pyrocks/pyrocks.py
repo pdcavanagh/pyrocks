@@ -9,23 +9,9 @@ import CifFile as cif
 import pickle
 import csv
 
-class Result:
-    def __init__(self, name):
-        self.opt = name
-        self.obj_fun = 0.0
-        self.opt_var = ''
-        self.var_value = 0.0
-        self.obj_fun_result = 0.0
-
-    def add_variable(self, var_name):
-        self.opt_var = var_name    
-
-    def add_value(self, var_value):
-        self.var_value=var_value
-                    
-    def add_obj_fun_result(self, objValue):
-        self.obj_fun_result = objValue
-
+#-----------------------------------------------------------------------------#
+# Class: Model 
+#-----------------------------------------------------------------------------#
 class Model:
     def __init__(self, name):
         self.name = name
@@ -58,17 +44,125 @@ class Model:
     def add_bulk(self, oxide, wt):
         self.bulk[oxide] = wt
 
+#-----------------------------------------------------------------------------#
+# Class: Mineral Phase Class
+# Comments: Contains all information relevant for a phase to be added to model
+# Attributes:
+#   Name 
+#   Chemical formula
+#   QXRD abundance
+#   Oxide composition
+#   Variability of individual oxide components
+#-----------------------------------------------------------------------------#
+class Phase:
+    def __init__(self, name):
+        self.name = name
+        self.formula = ''
+        self.qxrd = 0
+        self.qxrd_error = 0
+        self.oxide_comp = {'SiO2': 0,
+                           'TiO2': 0,
+                           'Al2O3': 0, 
+                           'Fe': 0,
+                           'MnO':  0,
+                           'MgO':  0,
+                           'CaO':  0,
+                           'Na2O': 0,
+                           'K2O':  0,
+                           'SO3':  0,
+                           'Cl':   0,
+                           'H2O':  0,
+                           'F':    0}
+        self.phase_variables = {}
+
+    def add_formula(self, formula):
+        self.formula = formula
+
+    def add_qxrd(self, qxrd):
+        self.qxrd = qxrd
+
+    def add_qxrd_error(self, error):
+        self.qxrd_error = error
+
+    def set_oxide_comp(self, oxide, value):
+        self.oxide_comp[oxide] = value 
+
+    def add_phase_variable(self, name, constraint, value):
+        try:  
+            self.phase_variables[name][constraint]=value
+        except:
+            self.phase_variables[name] = {}
+            self.phase_variables[name][constraint]=value
+
+#-----------------------------------------------------------------------------#
+# Class: Oxide Class
+# Comments: 
+#-----------------------------------------------------------------------------#
+class Oxides:
+    def __init__(self, name, oxides):
+        self.name = name 
+        self.oxides = { 'SiO2': 0,
+                        'TiO2': 0,
+                        'Al2O3': 0, 
+                        'Fe': 0,
+                        'MnO':  0,
+                        'MgO':  0,
+                        'CaO':  0,
+                        'Na2O': 0,
+                        'K2O':  0,
+                        'SO3':  0,
+                        'Cl':  0,
+                        'H2O':  0,
+                        'F':   0}
+        for x,y in oxides.items():
+            self.oxides[x] = y    
+        def set_oxide(self, oxide_name, value):
+            self.oxides[oxide_name] = value 
+
+#-----------------------------------------------------------------------------#
+# Class: Result
+#-----------------------------------------------------------------------------#
+class Result:
+    def __init__(self, name):
+        self.opt = name
+        self.obj_fun = 0.0
+        self.opt_var = ''
+        self.var_value = 0.0
+        self.obj_fun_result = 0.0
+
+    def add_variable(self, var_name):
+        self.opt_var = var_name    
+
+    def add_value(self, var_value):
+        self.var_value=var_value
+                    
+    def add_obj_fun_result(self, objValue):
+        self.obj_fun_result = objValue
+
+#-----------------------------------------------------------------------------#
+# Function: save_model
+# Returns: none 
+#-----------------------------------------------------------------------------#
 def save_model(model, fn):
     output = open(fn, 'wb')
     pickle.dump(model, output)
     output.close()
 
+#-----------------------------------------------------------------------------#
+# Function: open_model
+# Returns: model object restored from pickle 
+#-----------------------------------------------------------------------------#
 def open_model(fn):
     pkl_file = open(fn, 'rb')
     model = pickle.load(pkl_file)
     pkl_file.close()
     return model
 
+#-----------------------------------------------------------------------------#
+# Function: save_results 
+# Args: model, res
+# Returns: none
+#-----------------------------------------------------------------------------#
 def save_results(model, res):
     fn_out = './output/' + model.name + '_out-test.csv'
     amorph_fn = './output/' + model.name + '_amorph_' + str(time.localtime().tm_year) + \
@@ -170,6 +264,12 @@ def save_results(model, res):
                 'Minimum': phase_min_dict[x], 'Maximum': max_dict[x], 
                 'Upper Bound': upBound[x]})
 
+#-----------------------------------------------------------------------------#
+# Function: add_clay_comp
+# Args: model, comp_name
+# Returns: none
+# Comment: 
+#-----------------------------------------------------------------------------#
 def add_clay_comp(mdl, comp_name):
     if comp_name=='default': 
         # Add smectite
@@ -251,6 +351,12 @@ def add_clay_comp(mdl, comp_name):
     #    mdl.phases['smectite'].add_phase_variable('DX_smectite_H2O', 'H2O', 1.1)
         mdl.phases['smectite'].add_phase_variable('smectite_oxides=100.0', 0.0, 0.0)
 
+#-----------------------------------------------------------------------------#
+# Function: add_amorph_comp
+# Args: model, comp_name, scl
+# Returns: none
+# Comment: 
+#-----------------------------------------------------------------------------#
 def add_amorph_comp(mdl, comp_name, scl):
     if comp_name=='general':
         amorph_comp = { 'SiO2': 39.0,
@@ -570,79 +676,6 @@ def add_amorph_comp(mdl, comp_name, scl):
     mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', scl*amorph_delta['Cl'])
     mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
 
-# Mineral Phase Class
-# Contains all information relevant for a phase to be added to model
-# Attributes:
-#   Name 
-#   Chemical formula
-#   QXRD abundance
-#   Oxide composition
-#   Variability of individual oxide components
-class Phase:
-    def __init__(self, name):
-        self.name = name
-        self.formula = ''
-        self.qxrd = 0
-        self.qxrd_error = 0
-        self.oxide_comp = {'SiO2': 0,
-                           'TiO2': 0,
-                           'Al2O3': 0, 
-                           'Fe': 0,
-                           'MnO':  0,
-                           'MgO':  0,
-                           'CaO':  0,
-                           'Na2O': 0,
-                           'K2O':  0,
-                           'SO3':  0,
-                           'Cl':   0,
-                           'H2O':  0,
-                           'F':    0}
-        #self.delta_oxides = {}
-        self.phase_variables = {}
-
-    def add_formula(self, formula):
-        self.formula = formula
-
-    def add_qxrd(self, qxrd):
-        self.qxrd = qxrd
-
-    def add_qxrd_error(self, error):
-        self.qxrd_error = error
-
-    def set_oxide_comp(self, oxide, value):
-        self.oxide_comp[oxide] = value 
-
-#    def add_delta_oxide(self, oxide, wts):
-#        self.delta_oxides[oxide] = Oxides(oxide, wts)
-
-    def add_phase_variable(self, name, constraint, value):
-        try:  
-            self.phase_variables[name][constraint]=value
-        except:
-            self.phase_variables[name] = {}
-            self.phase_variables[name][constraint]=value
-
-
-class Oxides:
-    def __init__(self, name, oxides):
-        self.name = name 
-        self.oxides = { 'SiO2': 0,
-                        'TiO2': 0,
-                        'Al2O3': 0, 
-                        'Fe': 0,
-                        'MnO':  0,
-                        'MgO':  0,
-                        'CaO':  0,
-                        'Na2O': 0,
-                        'K2O':  0,
-                        'SO3':  0,
-                        'Cl':  0,
-                        'H2O':  0,
-                        'F':   0}
-        for x,y in oxides.items():
-            self.oxides[x] = y    
-        def set_oxide(self, oxide_name, value):
-            self.oxides[oxide_name] = value 
 
 # Example bulk composition oxide components
 bulk = ['SiO2',
@@ -658,35 +691,6 @@ bulk = ['SiO2',
         'Cl', 
         'H2O', 
         'F']
-
-# Dictionary element to oxide 
-elem2oxide = {'Si': 'SiO2',
-              'Ca': 'CaO',
-              'Na': 'Na2O',
-              'Al': 'Al2O3', 
-              'Mg': 'MgO', 
-              'H': 'H2O', 
-              'K': 'K2O'}
-
-# Dictionary of atomic weights
-atomic_wt = {'Si': 28.086, 
-             'Ca': 40.078, 
-             'Na': 22.99, 
-             'Al': 26.982, 
-             'O': 15.999, 
-             'Mg': 24.305, 
-             'H': 1.00794, 
-             'K': 39.0983}
-
-# Dictionary of number of oxygens per oxide component
-num_oxy =   {'Si': 2, 
-             'Ca': 1, 
-             'Na': 0.5, 
-             'Al': 3/2, 
-             'O': 1, 
-             'Mg': 1, 
-             'H': 0.5, 
-             'K': 0.5}
 
 def is_number(s):
     try:
@@ -709,31 +713,31 @@ def getAPXSData(url, web_flag):
     return data_array
          
 
-# Functions for seperating a chemical forumla into atom components
-# Returns list of elements and list of stoiciometric coefficients
-def form_split(form_str):
-    element = []
-    elem_num = []
-
-    flag=False
-
-    s = re.split('\s',form_str)
-    for j in s:
-        temp_elem=str(j).strip('()')
-        temp_elem2 = re.split('([A-Z][a-z])|([A-Z])', temp_elem)
-        for k in temp_elem2:
-          if k != None:
-            if str(k).isalpha():
-                element.append(k)
-                if flag==False:
-                    flag=True
-                else:
-                    elem_num.append(1)
-                    flag=False
-            if is_number(str(k)):
-                elem_num.append(float(k))
-                flag=False
-    return element, elem_num
+## Functions for seperating a chemical forumla into atom components
+## Returns list of elements and list of stoiciometric coefficients
+#def form_split(form_str):
+#    element = []
+#    elem_num = []
+#
+#    flag=False
+#
+#    s = re.split('\s',form_str)
+#    for j in s:
+#        temp_elem=str(j).strip('()')
+#        temp_elem2 = re.split('([A-Z][a-z])|([A-Z])', temp_elem)
+#        for k in temp_elem2:
+#          if k != None:
+#            if str(k).isalpha():
+#                element.append(k)
+#                if flag==False:
+#                    flag=True
+#                else:
+#                    elem_num.append(1)
+#                    flag=False
+#            if is_number(str(k)):
+#                elem_num.append(float(k))
+#                flag=False
+#    return element, elem_num
 
 def saveResults(resultVars):
     for v in resultVars:
@@ -741,8 +745,12 @@ def saveResults(resultVars):
             #if v.name[0:8] == 'Phase_X_':
                 logging.debug('%-25s = %6.4f' % (v.name, v.varValue))
     
-
-#------------- Creation of the PuLP optimization -------------------------------
+#-----------------------------------------------------------------------------#
+# Function: optimize_phase
+# Args: model, maxPhase, objFunWt 
+# Returns: none
+# Comments: Creation of the PuLP optimization 
+#-----------------------------------------------------------------------------#
 def optimize_phase(model, maxPhase, objFunWt): 
     variables = []   # List of all optimization variables
     phase_abun = {}  # Dictionary of QXRD abudances 
