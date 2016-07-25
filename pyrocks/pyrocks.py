@@ -8,10 +8,11 @@ import pulp
 import CifFile as cif
 import pickle
 import csv
+import amorph_const
 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Class: Model 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 class Model:
     def __init__(self, name):
         self.name = name
@@ -44,7 +45,7 @@ class Model:
     def add_bulk(self, oxide, wt):
         self.bulk[oxide] = wt
 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Class: Mineral Phase Class
 # Comments: Contains all information relevant for a phase to be added to model
 # Attributes:
@@ -53,7 +54,7 @@ class Model:
 #   QXRD abundance
 #   Oxide composition
 #   Variability of individual oxide components
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 class Phase:
     def __init__(self, name):
         self.name = name
@@ -94,10 +95,10 @@ class Phase:
             self.phase_variables[name] = {}
             self.phase_variables[name][constraint]=value
 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Class: Oxide Class
 # Comments: 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 class Oxides:
     def __init__(self, name, oxides):
         self.name = name 
@@ -119,9 +120,9 @@ class Oxides:
         def set_oxide(self, oxide_name, value):
             self.oxides[oxide_name] = value 
 
-#-----------------------------------------------------------------------------#
+#-------------------------------------------------------------------------------#
 # Class: Result
-#-----------------------------------------------------------------------------#
+#-------------------------------------------------------------------------------#
 class Result:
     def __init__(self, name):
         self.opt = name
@@ -139,30 +140,30 @@ class Result:
     def add_obj_fun_result(self, objValue):
         self.obj_fun_result = objValue
 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Function: save_model
 # Returns: none 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 def save_model(model, fn):
     output = open(fn, 'wb')
     pickle.dump(model, output)
     output.close()
 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Function: open_model
 # Returns: model object restored from pickle 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 def open_model(fn):
     pkl_file = open(fn, 'rb')
     model = pickle.load(pkl_file)
     pkl_file.close()
     return model
 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Function: save_results 
 # Args: model, res
 # Returns: none
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 def save_results(model, res):
     fn_out = './output/' + model.name + '_out-test.csv'
     amorph_fn = './output/' + model.name + '_amorph_' + str(time.localtime().tm_year) + \
@@ -264,12 +265,12 @@ def save_results(model, res):
                 'Minimum': phase_min_dict[x], 'Maximum': max_dict[x], 
                 'Upper Bound': upBound[x]})
 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Function: add_clay_comp
 # Args: model, comp_name
 # Returns: none
 # Comment: 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 def add_clay_comp(mdl, comp_name):
     if comp_name=='default': 
         # Add smectite
@@ -351,305 +352,38 @@ def add_clay_comp(mdl, comp_name):
     #    mdl.phases['smectite'].add_phase_variable('DX_smectite_H2O', 'H2O', 1.1)
         mdl.phases['smectite'].add_phase_variable('smectite_oxides=100.0', 0.0, 0.0)
 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Function: add_amorph_comp
 # Args: model, comp_name, scl
 # Returns: none
 # Comment: 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 def add_amorph_comp(mdl, comp_name, scl):
+    print "Amorphous Composition Used: %s" % comp_name
     if comp_name=='general':
-        amorph_comp = { 'SiO2': 39.0,
-                        'TiO2': 2.0,
-                        'Al2O3': 6.0,
-                        'Fe': 25.0,
-                        'MnO': 1.0,
-                        'MgO': 5.0,
-                        'CaO': 6.0,
-                        'Na2O': 4.0,
-                        'K2O': 1.0,
-                        'SO3': 10.0,
-                        'Cl': 1.0}
-        #amorphous oxide component delta scaling value
-        amorph_delta = { 'SiO2':   -5.0,
-                         'TiO2':   1.0,
-                         'Al2O3': -1.0,
-                         'Fe':     3.0,
-                         'MnO':    -0.1,
-                         'MgO':   -1.0,
-                         'CaO':   -1.0,
-                         'Na2O':  -1.0,
-                         'K2O':    0.1,
-                         'SO3':    1.0,
-                         'Cl':     1.0}
+        amorph_comp = amorph_const.general
+        amorph_delta = amorph_const.general_delta
 
-    if comp_name=='general-jk':
-        amorph_comp = { 'SiO2': 39.0,
-                        'TiO2': 2.0,
-                        'Al2O3': 6.0,
-                        'Fe': 25.0,
-                        'MnO': 1.0,
-                        'MgO': 5.0,
-                        'CaO': 6.0,
-                        'Na2O': 4.0,
-                        'K2O': 1.0,
-                        'SO3': 10.0,
-                        'Cl': 1.0}
-        #amorphous oxide component delta scaling value
-        amorph_delta = { 'SiO2':   5.0,
-                         'TiO2':   5.0,
-                         'Al2O3': -5.0,
-                         'Fe':     -5.0,
-                         'MnO':    -5.1,
-                         'MgO':   5.0,
-                         'CaO':   5.0,
-                         'Na2O':  5.0,
-                         'K2O':    -5.0,
-                         'SO3':    -5.0,
-                         'Cl':     5.0}
+    if comp_name=='general_jk':
+        amorph_comp = amorph_const.general_jk
+        amorph_delta = amorph_const.general_jk_delta
 
     if comp_name=='default':
-        amorph_comp = { 'SiO2': 37.2,
-                        'TiO2': 2.06,
-                        'Al2O3': 6.04,
-                        'Fe': 23.14,
-                        'MnO': 0.91,
-                        'MgO': 4.86,
-                        'CaO': 5.61,
-                        'Na2O': 3.56,
-                        'K2O': 0.89,
-                        'SO3': 11.01,
-                        'Cl': 0.1}
-        #amorphous oxide component delta scaling value
-        amorph_delta = { 'SiO2':   3.72,
-                         'TiO2':   0.206,
-                         'Al2O3': -0.604,
-                         'Fe':     2.314,
-                         'MnO':    0.091,
-                         'MgO':   -0.486,
-                         'CaO':   -0.561,
-                         'Na2O':  -0.356,
-                         'K2O':    0.089,
-                         'SO3':    1.101,
-                         'Cl':     1.01}
-         
-    elif comp_name=='default-ch':
-        amorph_comp = { 'SiO2': 37.2,
-                        'TiO2': 2.06,
-                        'Al2O3': 6.04,
-                        'Fe': 23.14,
-                        'MnO': 0.91,
-                        'MgO': 4.86,
-                        'CaO': 5.61,
-                        'Na2O': 3.56,
-                        'K2O': 0.89,
-                        'SO3': 11.01,
-                        'Cl': 0.1}
-        #amorphous oxide component delta scaling value
-        amorph_delta = { 'SiO2':   3.72,
-                         'TiO2':   0.206,
-                         'Al2O3':  0.604,
-                         'Fe':     -2.314,
-                         'MnO':    0.091,
-                         'MgO':    -0.486,
-                         'CaO':    -0.561,
-                         'Na2O':   0.356,
-                         'K2O':    0.089,
-                         'SO3':    1.101,
-                         'Cl':     1.01}
+        amorph_comp = amorph_const.default
+        amorph_delta = amorph_const.default_delta
 
-    elif comp_name=='default-tp':
-        amorph_comp = { 'SiO2': 37.2,
-                        'TiO2': 2.06,
-                        'Al2O3': 6.04,
-                        'Fe': 23.14,
-                        'MnO': 0.91,
-                        'MgO': 4.86,
-                        'CaO': 5.61,
-                        'Na2O': 3.56,
-                        'K2O': 0.89,
-                        'SO3': 11.01,
-                        'Cl': 0.1}
-        #amorphous oxide component delta scaling value
-        amorph_delta = { 'SiO2':   3.72,
-                         'TiO2':   0.206,
-                         'Al2O3':  0.604,
-                         'Fe':     -2.314,
-                         'MnO':    0.091,
-                         'MgO':    0.5, #change from 0.486
-                         'CaO':    -0.561,
-                         'Na2O':   0.356,
-                         'K2O':    0.089,
-                         'SO3':    1.101,
-                         'Cl':     1.01}
+    if comp_name=='default_ch':
+        amorph_comp = amorph_const.default_ch
+        amorph_delta = amorph_const.default_ch_delta
 
-    elif comp_name=='default-bk':
-        amorph_comp = { 'SiO2': 77.49,
-                        'TiO2': 2.59,
-                        'Al2O3': 0.03,
-                        'Cr2O3': 0.15,
-                        'Fe': 4.29,
-                        'MnO': 0.11,
-                        'MgO': 1.17,
-                        'CaO': 1.53,
-                        'Na2O': 1.54,
-                        'K2O': 0.72,
-                        'P2O5': 2.1,
-                        'SO3': 7.28,
-                        'Cl': 0.47}
-        #amorphous oxide component delta scaling value
-        amorph_delta = { 'SiO2': 7.749,
-                        'TiO2': .259,
-                        'Al2O3': .003,
-                        'Cr2O3': .015,
-                        'Fe': .429,
-                        'MnO': .011,
-                        'MgO': .117,
-                        'CaO': .153,
-                        'Na2O': .154,
-                        'K2O': .072,
-                        'P2O5': .21,
-                        'SO3': .728,
-                        'Cl': .047}
+    if comp_name=='default_tp':
+        amorph_comp = amorph_const.default_tp
+        amorph_delta = amorph_const.default_tp_delta
 
-    elif comp_name=='dehouck-griffith-sap1-30':
-        # Rocknest amorphous componenet added 2/22/16
-        # Add amorphous oxide weight percent to phases of model
-        amorph_comp = { 'SiO2', 36.1,
-                        'TiO2', 2.3,
-                        'Al2O3', 1.8,
-                        'Cr2O3', 1.4,
-                        'Fe', 24.7,
-                        'MnO', 0.8,
-                        'MgO', 8.8,
-                        'CaO', 6.9,
-                        'Na2O', 4.8,
-                        'K2O', 0.7,
-                        'P2O5', 3.2,
-                        'SO3', 2.2,
-                        'Cl', 4.2}
-        # Add amorphous oxide weight percent delta values
-        amorph_delta = {'SiO2', 7.8,
-                        'TiO2', 0.7,
-                        'Al2O3', 2.7,
-                        'Fe', 10.0,
-                        'MnO', 0.1,
-                        'MgO', 5.8,
-                        'CaO', 3.7,
-                        'Na2O', 1.2,
-                        'K2O', 0.5,
-                        'P2O5', 0.0,
-                        'SO3', 3.0,
-                        'Cl', 0.4}
-    elif comp_name=='dehouck-griffith-sap1-45':
-        # Add amorphous oxide weight percent to phases of model
-        amorph_comp = { 'SiO2', 39.4,
-                        'TiO2', 1.7,
-                        'Al2O3', 5.0,
-                        'Cr2O3', 1.0,
-                        'Fe', 23.6,
-                        'MnO', 0.6,
-                        'MgO', 9.1,
-                        'CaO', 6.6,
-                        'Na2O', 3.9,
-                        'K2O', 0.6,
-                        'P2O5', 2.1,
-                        'SO3', 2.4,
-                        'Cl', 2.9}
-        # Add amorphous oxide weight percent delta values
-        amorph_delta = {'SiO2', 4.4,
-                        'TiO2', 0.4,
-                        'Al2O3', 2.4,
-                        'Fe', 5.2,
-                        'MnO', 0.0,
-                        'MgO', 3.15,
-                        'CaO', 1.95,
-                        'Na2O', 0.85,
-                        'K2O', 0.25,
-                        'P2O5', 0.0,
-                        'SO3', 2.15,
-                        'Cl', 0.2}
-    elif comp_name=='dehouck-griffith-sap2-30':
-        # Add amorphous oxide weight percent to phases of model
-        amorph_comp = { 'SiO2': 37.2,
-                        'TiO2': 2.2, 
-                        'Al2O3': 1.0,
-                        'Cr2O3': 1.4,
-                        'Fe': 24.7,
-                        'MnO': 0.7,
-                        'MgO': 10.4,
-                        'CaO': 5.8,
-                        'Na2O': 4.4,
-                        'K2O': 0.7,
-                        'P2O5': 3.2,
-                        'SO3': 2.2,
-                        'Cl': 4.2}
-        # Add amorphous oxide weight percent delta values
-        amorph_delta = {'SiO2': 7.45,
-                        'TiO2': 0.7,
-                        'Al2O3': 2.25,
-                        'Fe': 9.75,
-                        'MnO': 0.15,
-                        'MgO': 5.1,
-                        'CaO': 3.2,
-                        'Na2O': 1.05,
-                        'K2O': 0.45,
-                        'P2O5': 0.0,
-                        'SO3': 2.95,
-                        'Cl': 0.35}
-    elif comp_name=='dehouck-griffith-sap2-45':
-        # Add amorphous oxide weight percent to phases of model
-        amorph_comp = { 'SiO2': 40.0,
-                        'TiO2': 1.6,
-                        'Al2O3': 4.6,
-                        'Cr2O3': 1.0,
-                        'Fe': 24.0,
-                        'MnO': 0.5,
-                        'MgO': 9.9,
-                        'CaO': 6.0,
-                        'Na2O': 3.7,
-                        'K2O': 0.6,
-                        'P2O5': 2.1,
-                        'SO3': 2.4,
-                        'Cl': 2.9}
-        # Add amorphous oxide weight percent delta values
-        amorph_delta = {'SiO2': 4.2,
-                        'TiO2': 0.4,
-                        'Al2O3': 2.3,
-                        'Fe': 5.2,
-                        'MnO': 0.1,
-                        'MgO': 2.9,
-                        'CaO': 1.8,
-                        'Na2O': 0.8,
-                        'K2O': 0.3,
-                        'P2O5': 0.0,
-                        'SO3': 1.2,
-                        'Cl': 0.2}
-    elif comp_name=='SapCa-1':
-    #    # SapCa-1 Model amorphous
-    #    # Add amorphous oxide weight percent to phases of model
-        amorph_comp = { 'SiO2': 30.1,
-                        'TiO2': 2.03,
-                        'Al2O3': 9.08,
-                        'Fe': 33.46,
-                        'MnO': .66,
-                        'MgO': 0.01,
-                        'CaO': 6.46,
-                        'Na2O': 3.68,
-                        'K2O': 0.56,
-                        'SO3': 8.72}
-        # Add amorphous oxide weight percent delta values
-        amorph_delta = {'SiO2': 3.72,
-                        'TiO2': 0.21,
-                        'Al2O3': 0.6,
-                        'Fe': 2.31,
-                        'MnO': 0.09,
-                        'MgO': 0.49,
-                        'CaO': 0.56,
-                        'Na2O': 0.36,
-                        'K2O': 0.09,
-                        'SO3': 1.1}
-    
+    if comp_name=='default_bk':
+        amorph_comp = amorph_const.default_bk
+        amorph_delta = amorph_const.default_bk_delta
+
     # Add amorphous oxide weight percent to phases of model
     mdl.phases['amorphous'].set_oxide_comp('SiO2', amorph_comp['SiO2'])
     mdl.phases['amorphous'].set_oxide_comp('TiO2', amorph_comp['TiO2'])
@@ -745,12 +479,12 @@ def saveResults(resultVars):
             #if v.name[0:8] == 'Phase_X_':
                 logging.debug('%-25s = %6.4f' % (v.name, v.varValue))
     
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 # Function: optimize_phase
 # Args: model, maxPhase, objFunWt 
 # Returns: none
 # Comments: Creation of the PuLP optimization 
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
 def optimize_phase(model, maxPhase, objFunWt): 
     variables = []   # List of all optimization variables
     phase_abun = {}  # Dictionary of QXRD abudances 
@@ -858,6 +592,7 @@ def optimize_phase(model, maxPhase, objFunWt):
 def optimize_routine(model, objFunWt, all_phases_flag, maxPhase):
     result_output_list=[]
     # Run the optimization for the selected phase to maximize
+    print 'Model: %s' % model.name
     if all_phases_flag == True:
         fn_out = './output/' + model.name + '_out.csv'
         with open(fn_out, 'w') as csvfile:
@@ -868,7 +603,7 @@ def optimize_routine(model, objFunWt, all_phases_flag, maxPhase):
                 print '**********Maximizing %s*********' % x
                 status, results, objValue = optimize_phase(model, x, objFunWt)
                 # The status of the solution is printed to the screen
-                logging.debug("Status: %s" % status)
+                logging.critical("Status: %s" % status)
   
                 # Each of the variables is printed with it's resolved optimum value
                 for y in results:
