@@ -368,6 +368,10 @@ def add_amorph_comp(mdl, comp_name, scl):
         amorph_comp = amorph_const.general_jk
         amorph_delta = amorph_const.general_jk_delta
 
+    if comp_name=='general_wj':
+        amorph_comp = amorph_const.general_wj
+        amorph_delta = amorph_const.general_wj_delta
+
     if comp_name=='default':
         amorph_comp = amorph_const.default
         amorph_delta = amorph_const.default_delta
