@@ -9,6 +9,7 @@ import CifFile as cif
 import pickle
 import csv
 import amorph_const
+import HTML
 
 #------------------------------------------------------------------------------#
 # Class: Model 
@@ -266,6 +267,99 @@ def save_results(model, res):
                 'Upper Bound': upBound[x]})
 
 #------------------------------------------------------------------------------#
+# Function: write_html 
+# Args: 
+# Returns: none
+# Comment: 
+#------------------------------------------------------------------------------#
+def write_html(model, res):
+    # open an HTML file to show output in a browser
+    HTMLFILE = 'pyrocks_output.html'
+    f = open(HTMLFILE, 'w')
+    
+    curTime = time.asctime()
+    
+    f.write('<p>Current Time: ' + curTime + '</p>')
+
+    # create a max and min list
+    max_dict = {}
+    min_dict = {}
+    phase_min_dict = {}
+    amorph_comp = {} 
+    amorph_all = {} 
+ 
+    # Record the constraints for the mineral phases 
+    lowBound ={} 
+    upBound ={} 
+    for x in model.phases:
+        if model.phases[x].qxrd - model.phases[x].qxrd_error >= 0:
+            lowBound[x] = model.phases[x].qxrd - model.phases[x].qxrd_error
+            upBound[x] = model.phases[x].qxrd + model.phases[x].qxrd_error
+        else:
+            lowBound[x] = 0.0    
+            upBound[x] = model.phases[x].qxrd + model.phases[x].qxrd_error
+    
+    varTable = HTML.Table(header_row=['Opt', 'Oxide', 'Initial', 'Delta', 'Final',  'Wt Percent'])
+    for x in res:
+        delta_oxide = str(x.opt_var)[19:] 
+        if x.opt=='amorphous':
+            print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
+        if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
+            amorph_comp[delta_oxide]=x.var_value
+        phase=str(x.opt_var)[8:] #strip phase name from variable, remove 'Phase_X_'
+
+        if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
+            initial = model.phases['amorphous'].oxide_comp[delta_oxide] 
+            delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + delta_oxide]
+            final =  amorph_comp[delta_oxide]*delta[delta_oxide]
+            wt_perc = initial + final 
+
+            # Write the html table rows
+            varTable.rows.append([x.opt, delta_oxide, initial, delta[delta_oxide], final,  wt_perc])
+
+        # Encounter optimization value for first time, initialize to first value
+        if x.opt_var not in min_dict:
+            min_dict[x.opt_var] = x.var_value
+
+        # Create list of max values for each phase optimization
+        if x.opt==phase:
+            max_dict[x.opt]=x.var_value
+
+        # Update the list of min results
+        if x.var_value < min_dict[x.opt_var]:
+            min_dict[x.opt_var] = x.var_value
+    
+    v = str(varTable)
+    f.write(v) 
+    
+    f.write('<br />')
+ 
+    # Calculate the amorphous component composition from the amorphous maximization
+    amorphTable = HTML.Table(header_row=['Oxide', 'Weight Percent'])
+    for y in amorph_comp:
+        wt_perc = model.phases['amorphous'].oxide_comp[y] 
+        delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + str(y)]
+        amorphTable.rows.append([y, wt_perc+amorph_comp[y]*delta[y]]) 
+    am = str(amorphTable)
+    f.write(am) 
+     
+    f.write('<br />')
+
+ 
+    for x in min_dict:
+        if x[0:8]=='Phase_X_':
+            phase_min_dict[x[8:]]=min_dict[x]
+        
+   
+    # Write the phase abundance results table 
+    abundTable = HTML.Table(header_row=['Phase', 'Lower Bound', 'Minimum', 'Maximum', 'Upper Bound'])
+    for x in max_dict:
+        abundTable.rows.append([x, lowBound[x], phase_min_dict[x], max_dict[x], upBound[x]])
+    a = str(abundTable)
+    f.write(a)
+    
+
+#------------------------------------------------------------------------------#
 # Function: add_clay_comp
 # Args: model, comp_name
 # Returns: none
@@ -372,6 +466,22 @@ def add_amorph_comp(mdl, comp_name, scl):
         amorph_comp = amorph_const.general_wj
         amorph_delta = amorph_const.general_wj_delta
 
+    if comp_name=='general_ch':
+        amorph_comp = amorph_const.general_ch
+        amorph_delta = amorph_const.general_ch_delta
+
+    if comp_name=='general_mj':
+        amorph_comp = amorph_const.general_mj
+        amorph_delta = amorph_const.general_mj_delta
+
+    if comp_name=='general_tp':
+        amorph_comp = amorph_const.general_tp
+        amorph_delta = amorph_const.general_tp_delta
+
+    if comp_name=='general_bk':
+        amorph_comp = amorph_const.general_bk
+        amorph_delta = amorph_const.general_bk_delta
+
     if comp_name=='default':
         amorph_comp = amorph_const.default
         amorph_delta = amorph_const.default_delta
@@ -414,6 +524,7 @@ def add_amorph_comp(mdl, comp_name, scl):
     mdl.phases['amorphous'].add_phase_variable('DX_amorphous_Cl', 'Cl', scl*amorph_delta['Cl'])
     mdl.phases['amorphous'].add_phase_variable('amorphous_oxides=100', 0.0, 0.0)
 
+    print amorph_comp
 
 # Example bulk composition oxide components
 bulk = ['SiO2',
@@ -531,7 +642,7 @@ def optimize_phase(model, maxPhase, objFunWt):
     objfun['X_' + maxPhase] = objFunWt
     for x in model.free_variables:
         objfun[x]=model.free_variables[x]['objfun']
-        #print model.free_variables[x]['objfun']
+        print x 
     
     # Initialize all phases to 1 and other variables to 0
     # Constraint for phase fraction is that all phases add to 1
@@ -598,34 +709,30 @@ def optimize_routine(model, objFunWt, all_phases_flag, maxPhase):
     # Run the optimization for the selected phase to maximize
     print 'Model: %s' % model.name
     if all_phases_flag == True:
-        fn_out = './output/' + model.name + '_out.csv'
-        with open(fn_out, 'w') as csvfile:
-            fieldnames = ['Opt', 'Mineral or Variable', 'Wt Percent']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            for x in model.phases:
-                print '**********Maximizing %s*********' % x
-                status, results, objValue = optimize_phase(model, x, objFunWt)
-                # The status of the solution is printed to the screen
-                logging.critical("Status: %s" % status)
-  
-                # Each of the variables is printed with it's resolved optimum value
-                for y in results:
-                    temp_result = Result(x)     
-                    temp_result.add_variable(y.name)
-                    temp_result.add_value(y.varValue)
-                    #logging.debug('%-25s = %6.4f' % (y.name, y.varValue))
-                    result_output_list.append(temp_result)
+#        fn_out = './output/' + model.name + '_out.csv'
+#        with open(fn_out, 'w') as csvfile:
+#            fieldnames = ['Opt', 'Mineral or Variable', 'Wt Percent']
+#            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+#            writer.writeheader()
+        for x in model.phases:
+           print '**********Maximizing %s*********' % x
+           status, results, objValue = optimize_phase(model, x, objFunWt)
+           # The status of the solution is printed to the screen
+           logging.critical("Status: %s" % status)
 
-                try:
-                    logging.debug('Objective Function Value: %2.4f' % objValue)
-                    temp_result.add_obj_fun_result(objValue)
-                except:
-                    logging.debug('Objective function value unavailable')
-#        for x in result_output_list:
-#            print x.opt
-#            print x.var_value
-#            print x.opt_var
+           # Each of the variables is printed with it's resolved optimum value
+           for y in results:
+               temp_result = Result(x)     
+               temp_result.add_variable(y.name)
+               temp_result.add_value(y.varValue)
+               #logging.debug('%-25s = %6.4f' % (y.name, y.varValue))
+               result_output_list.append(temp_result)
+
+           try:
+               logging.debug('Objective Function Value: %2.4f' % objValue)
+               temp_result.add_obj_fun_result(objValue)
+           except:
+               logging.debug('Objective function value unavailable')
         return result_output_list
 
     else:
