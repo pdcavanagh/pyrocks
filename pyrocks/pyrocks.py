@@ -10,6 +10,7 @@ import pickle
 import csv
 import amorph_const
 import HTML
+import json
 
 #------------------------------------------------------------------------------#
 # Class: Model 
@@ -206,18 +207,17 @@ def save_results(model, res):
             delta_oxide = str(x.opt_var)[19:] 
             if x.opt=='amorphous':
                 print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
-            if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
-                amorph_comp[delta_oxide]=x.var_value
-            phase=str(x.opt_var)[8:] #strip phase name from variable, remove 'Phase_X_'
+                if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
+                    amorph_comp[delta_oxide]=x.var_value
     
-            if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
-                initial = model.phases['amorphous'].oxide_comp[delta_oxide] 
-                delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + delta_oxide]
-                final =  amorph_comp[delta_oxide]*delta[delta_oxide]
+                    initial = model.phases['amorphous'].oxide_comp[delta_oxide] 
+                    delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + delta_oxide]
+                    final =  amorph_comp[delta_oxide]*delta[delta_oxide]
+                    wt_perc = initial + final 
 
-                wt_perc = initial + final 
-                #print '%s%s%s' % (x.opt,str(x.opt_var)[19:],x.var_value)
-                writer.writerow({'Opt': x.opt, 'Oxide': delta_oxide, 'Initial': initial, 'Delta': delta[delta_oxide], 'Final': final,  'Wt Percent': wt_perc})
+                    writer.writerow({'Opt': x.opt, 'Oxide': delta_oxide, 'Initial': initial, 'Delta': delta[delta_oxide], 'Final': final,  'Wt Percent': wt_perc})
+
+            phase=str(x.opt_var)[8:] #strip phase name from variable, remove 'Phase_X_'
     
             # Encounter optimization value for first time, initialize to first value
             if x.opt_var not in min_dict:
@@ -278,7 +278,18 @@ def write_html(model, res):
     f = open(HTMLFILE, 'w')
     
     curTime = time.asctime()
-    
+   
+    f.write('<html>');
+    f.write('  <head>');
+    f.write('    <meta charset="UTF-8">')
+    f.write('    <meta name="viewport" content="width=device-width, initial-scale=1.0">')
+    f.write('    <title>' + model.name + ' Model</title>')
+    f.write('    <link rel="stylesheet" href="style.css">')
+    f.write('  </head>');
+    f.write('<body>');
+
+    f.write('<h1>' + model.name + '</h1>')
+
     f.write('<p>Current Time: ' + curTime + '</p>')
 
     # create a max and min list
@@ -287,6 +298,9 @@ def write_html(model, res):
     phase_min_dict = {}
     amorph_comp = {} 
     amorph_all = {} 
+
+    # Maximization of amorphous component chemical composition
+    max_amorph_comp = {}
  
     # Record the constraints for the mineral phases 
     lowBound ={} 
@@ -300,15 +314,17 @@ def write_html(model, res):
             upBound[x] = model.phases[x].qxrd + model.phases[x].qxrd_error
     
     varTable = HTML.Table(header_row=['Opt', 'Oxide', 'Initial', 'Delta', 'Final',  'Wt Percent'])
+   
     for x in res:
-        delta_oxide = str(x.opt_var)[19:] 
-        if x.opt=='amorphous':
-            print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
         if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
-            amorph_comp[delta_oxide]=x.var_value
-        phase=str(x.opt_var)[8:] #strip phase name from variable, remove 'Phase_X_'
+            delta_oxide = str(x.opt_var)[19:] 
 
-        if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
+            if x.opt=='amorphous':
+                print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
+                max_amorph_comp[delta_oxide]=x.var_value
+
+            amorph_comp[delta_oxide]=x.var_value
+
             initial = model.phases['amorphous'].oxide_comp[delta_oxide] 
             delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + delta_oxide]
             final =  amorph_comp[delta_oxide]*delta[delta_oxide]
@@ -316,6 +332,8 @@ def write_html(model, res):
 
             # Write the html table rows
             varTable.rows.append([x.opt, delta_oxide, initial, delta[delta_oxide], final,  wt_perc])
+
+        phase=str(x.opt_var)[8:] #strip phase name from variable, remove 'Phase_X_'
 
         # Encounter optimization value for first time, initialize to first value
         if x.opt_var not in min_dict:
@@ -336,16 +354,16 @@ def write_html(model, res):
  
     # Calculate the amorphous component composition from the amorphous maximization
     amorphTable = HTML.Table(header_row=['Oxide', 'Weight Percent'])
-    for y in amorph_comp:
+    for y in max_amorph_comp:
         wt_perc = model.phases['amorphous'].oxide_comp[y] 
         delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + str(y)]
-        amorphTable.rows.append([y, wt_perc+amorph_comp[y]*delta[y]]) 
+        amorphTable.rows.append([y, wt_perc+max_amorph_comp[y]*delta[y]]) 
     am = str(amorphTable)
     f.write(am) 
      
     f.write('<br />')
 
- 
+    # Generate list of phase minimums 
     for x in min_dict:
         if x[0:8]=='Phase_X_':
             phase_min_dict[x[8:]]=min_dict[x]
@@ -358,6 +376,71 @@ def write_html(model, res):
     a = str(abundTable)
     f.write(a)
     
+    # Closing element tags of html file
+    f.write('</body>');
+    f.write('</html>');
+  
+    # Close the file after writing 
+    f.close();
+
+#------------------------------------------------------------------------------#
+# Function: write_json 
+# Args: 
+# Returns: none
+# Comment: 
+#------------------------------------------------------------------------------#
+def write_json(model, res):
+    # create a max and min list
+    max_dict = {}
+    min_dict = {}
+    phase_min_dict = {}
+    amorph_comp = {} 
+    amorph_all = {} 
+
+    # Maximization of amorphous component chemical composition
+    max_amorph_comp = {}
+
+    jsonTest = {'model': {}}
+    jsonTest['model'] = {'modelName': '', 'optim': {}}
+    jsonTest['model']['optim'] = {'variable': {}}
+    jsonTest['model']['optim']['variable'] = {'name': 'Phase_DX_sanidine_SiO2', 'wtPerc': 0.0}
+
+    print jsonTest
+
+    numPhases = len(model.phases)
+
+    curOpt = ''
+    prevOpt = 'prev'
+
+    # Walk through the each phase
+    for x in res:
+        curOpt = x.opt
+        if curOpt != prevOpt: 
+            jsonTest['model']['optim'] = model.name
+        jsonTest['model']['optim']['variable']['name'] = x.opt_var
+        jsonTest['model']['optim']['variable']['wtPerc'] = x.var_value
+        prevOpt = curOpt
+
+    print json.dumps(jsonTest,
+                    indent=2, separators=(',', ': '))
+
+    for x in res:
+        if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
+            delta_oxide = str(x.opt_var)[19:] 
+
+            if x.opt=='amorphous':
+                print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
+                max_amorph_comp[delta_oxide]=x.var_value
+
+            amorph_comp[delta_oxide]=x.var_value
+
+            initial = model.phases['amorphous'].oxide_comp[delta_oxide] 
+            delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + delta_oxide]
+            final =  amorph_comp[delta_oxide]*delta[delta_oxide]
+            wt_perc = initial + final 
+
+            # Write the html table rows
+            #varTable.rows.append([x.opt, delta_oxide, initial, delta[delta_oxide], final,  wt_perc])
 
 #------------------------------------------------------------------------------#
 # Function: add_clay_comp
