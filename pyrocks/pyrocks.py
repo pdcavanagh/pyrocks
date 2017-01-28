@@ -385,9 +385,9 @@ def write_html(model, res):
 
 #------------------------------------------------------------------------------#
 # Function: write_json 
-# Args: 
+# Args: model, results 
 # Returns: none
-# Comment: 
+# Comment: Writes JSON file with results from optimization(s) 
 #------------------------------------------------------------------------------#
 def write_json(model, res):
     # create a max and min list
@@ -400,12 +400,8 @@ def write_json(model, res):
     # Maximization of amorphous component chemical composition
     max_amorph_comp = {}
 
-    jsonTest = {'model': {}}
-    jsonTest['model'] = {'modelName': '', 'optim': {}}
-    jsonTest['model']['optim'] = {'variable': {}}
-    jsonTest['model']['optim']['variable'] = {'name': 'Phase_DX_sanidine_SiO2', 'wtPerc': 0.0}
-
-    print jsonTest
+    jsonOutput = {'model': {}}
+    jsonOutput['model'] = {'modelName': model.name, 'optim': []}
 
     numPhases = len(model.phases)
 
@@ -416,31 +412,13 @@ def write_json(model, res):
     for x in res:
         curOpt = x.opt
         if curOpt != prevOpt: 
-            jsonTest['model']['optim'] = model.name
-        jsonTest['model']['optim']['variable']['name'] = x.opt_var
-        jsonTest['model']['optim']['variable']['wtPerc'] = x.var_value
+            jsonOutput['model']['optim'].append({'optimName':  x.opt, 'variables': []})
+        jsonOutput['model']['optim'][-1]['variables'].append({'name': x.opt_var, 'wtPerc': x.var_value})
         prevOpt = curOpt
 
-    print json.dumps(jsonTest,
-                    indent=2, separators=(',', ': '))
+    with open(model.name + '_results.json', 'w') as f:
+        f.write(json.dumps(jsonOutput, indent=2, separators=(',', ': ')))
 
-    for x in res:
-        if str(x.opt_var)[0:18]=='Phase_DX_amorphous':
-            delta_oxide = str(x.opt_var)[19:] 
-
-            if x.opt=='amorphous':
-                print '%-15s%-40s%8f' % (x.opt, x.opt_var, x.var_value)
-                max_amorph_comp[delta_oxide]=x.var_value
-
-            amorph_comp[delta_oxide]=x.var_value
-
-            initial = model.phases['amorphous'].oxide_comp[delta_oxide] 
-            delta = model.phases['amorphous'].phase_variables['DX_amorphous_' + delta_oxide]
-            final =  amorph_comp[delta_oxide]*delta[delta_oxide]
-            wt_perc = initial + final 
-
-            # Write the html table rows
-            #varTable.rows.append([x.opt, delta_oxide, initial, delta[delta_oxide], final,  wt_perc])
 
 #------------------------------------------------------------------------------#
 # Function: add_clay_comp
@@ -537,49 +515,13 @@ def add_clay_comp(mdl, comp_name):
 #------------------------------------------------------------------------------#
 def add_amorph_comp(mdl, comp_name, scl):
     print "Amorphous Composition Used: %s" % comp_name
-    if comp_name=='general':
-        amorph_comp = amorph_const.general
-        amorph_delta = amorph_const.general_delta
 
-    if comp_name=='general_jk':
-        amorph_comp = amorph_const.general_jk
-        amorph_delta = amorph_const.general_jk_delta
-
-    if comp_name=='general_wj':
-        amorph_comp = amorph_const.general_wj
-        amorph_delta = amorph_const.general_wj_delta
-
-    if comp_name=='general_ch':
-        amorph_comp = amorph_const.general_ch
-        amorph_delta = amorph_const.general_ch_delta
-
-    if comp_name=='general_mj':
-        amorph_comp = amorph_const.general_mj
-        amorph_delta = amorph_const.general_mj_delta
-
-    if comp_name=='general_tp':
-        amorph_comp = amorph_const.general_tp
-        amorph_delta = amorph_const.general_tp_delta
-
-    if comp_name=='general_bk':
-        amorph_comp = amorph_const.general_bk
-        amorph_delta = amorph_const.general_bk_delta
-
-    if comp_name=='default':
-        amorph_comp = amorph_const.default
-        amorph_delta = amorph_const.default_delta
-
-    if comp_name=='default_ch':
-        amorph_comp = amorph_const.default_ch
-        amorph_delta = amorph_const.default_ch_delta
-
-    if comp_name=='default_tp':
-        amorph_comp = amorph_const.default_tp
-        amorph_delta = amorph_const.default_tp_delta
-
-    if comp_name=='default_bk':
-        amorph_comp = amorph_const.default_bk
-        amorph_delta = amorph_const.default_bk_delta
+    try:  
+        amorph_comp = amorph_const.amorphComp[str(comp_name)]
+        #amorph_delta = amorph_const.amorphComp[str(comp_name) + '_delta']
+        amorph_delta = amorph_const.amorphComp['general_delta']
+    except:
+        print '********* Amorphous Composition Not Found !!! ************'
 
     # Add amorphous oxide weight percent to phases of model
     mdl.phases['amorphous'].set_oxide_comp('SiO2', amorph_comp['SiO2'])
